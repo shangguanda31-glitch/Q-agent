@@ -1,5 +1,8 @@
 # QQ 智慧助理 — 项目规范
 
+**作者**: Orin Voss
+**仓库**: https://github.com/OrinVoss/Q-agent
+
 ## 开发准则
 
 ### 修改记录（必填）
