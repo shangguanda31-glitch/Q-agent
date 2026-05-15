@@ -13,11 +13,12 @@ image_cache/
 # Claude Code workspace
 claude_workspace/
 
-# Tesseract (not code)
-tesseract/bin/
-tesseract/tesseract_setup.exe
+# Tesseract binaries (keep tessdata only)
+tesseract/*.exe
+tesseract/*.dll
+tesseract/*.html
+tesseract/doc/
 tesseract/installer.exe
-tesseract/tesseract.zip
 
 # IDE
 .vscode/
