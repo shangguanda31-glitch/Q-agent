@@ -30,7 +30,7 @@ impl Config {
             napcat_http_url: std::env::var("NAPCAT_HTTP_URL")
                 .unwrap_or_else(|_| "http://127.0.0.1:4444".to_string()),
             napcat_token: std::env::var("NAPCAT_TOKEN")
-                .unwrap_or_else(|_| "NAPCAT_TOKEN_PLACEHOLDER".to_string()),
+                .unwrap_or_else(|_| "your_token_here".to_string()),
             llm_url: std::env::var("LLM_URL")
                 .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string()),
             llm_model: std::env::var("LLM_MODEL")
