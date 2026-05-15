@@ -19,6 +19,7 @@ tesseract/*.dll
 tesseract/*.html
 tesseract/doc/
 tesseract/installer.exe
+tesseract/*.zip
 
 # IDE
 .vscode/
