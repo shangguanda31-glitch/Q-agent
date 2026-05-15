@@ -17,6 +17,6 @@
 ## 配置
 - NapCatQQ WebSocket: ws://127.0.0.1:4447
 - NapCat HTTP API: http://127.0.0.1:4444
-- Token: NAPCAT_TOKEN_PLACEHOLDER
+- Token: your_token
 - LLM: Qwen3.5-9B on port 8080
 - Web 面板: http://127.0.0.1:5050

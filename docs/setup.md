@@ -31,7 +31,7 @@ cargo run --release
 |------|--------|------|
 | NAPCAT_WS_URL | ws://127.0.0.1:4447 | NapCatQQ WebSocket |
 | NAPCAT_HTTP_URL | http://127.0.0.1:4444 | NapCatQQ HTTP API |
-| NAPCAT_TOKEN | NAPCAT_TOKEN_PLACEHOLDER | 鉴权 Token |
+| NAPCAT_TOKEN | your_token | 鉴权 Token |
 | WEB_PORT | 5050 | 面板端口（自动回退 5051-5053）|
 | LLM_URL | http://127.0.0.1:8080 | llama-server |
 | MAX_TOOL_ITERATIONS | 10 | Agent 循环最大轮次 |
