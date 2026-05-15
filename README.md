@@ -39,7 +39,7 @@ cargo run --release
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
 | `NAPCAT_WS_URL` | `ws://127.0.0.1:4447` | NapCatQQ WebSocket |
-| `NAPCAT_TOKEN` | `20080103` | 鉴权 Token |
+| `NAPCAT_TOKEN` | — | 鉴权 Token（需设置） |
 | `WEB_PORT` | `5050` | 面板端口 |
 | `CLAUDE_CODE_TIMEOUT` | `120` | Claude Code 超时(秒) |
 
