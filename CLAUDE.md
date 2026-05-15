@@ -46,6 +46,12 @@
 | src/web/mod.rs | Web 面板 + API |
 | changelog/ | 修改记录（每次提交必填） |
 
+### 安全规范
+- ⚠️ **严禁** 将 Token、密码、密钥等敏感信息写入文档、README、changelog 或任何公开文件
+- 配置默认值应使用占位符（如 `your_token_here`），而非真实值
+- 敏感信息仅通过环境变量传入，不硬编码在源码中
+- 推送到 GitHub 前检查是否泄露了个人信息
+
 ## 调试
 - 日志级别：RUST_LOG=qq_assistant=debug
 - Web 面板：http://127.0.0.1:5050
