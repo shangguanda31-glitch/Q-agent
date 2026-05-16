@@ -55,17 +55,19 @@ pub struct AgentMessage {
 pub struct LLMClient {
     client: reqwest::Client,
     base_url: String,
+    embed_url: String,
     model: String,
 }
 
 impl LLMClient {
-    pub fn new(base_url: &str, model: &str) -> Self {
+    pub fn new(base_url: &str, embed_url: &str, model: &str) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .no_proxy()
                 .build()
                 .expect("Failed to build HTTP client"),
             base_url: base_url.trim_end_matches('/').to_string(),
+            embed_url: embed_url.trim_end_matches('/').to_string(),
             model: model.to_string(),
         }
     }
@@ -161,7 +163,7 @@ impl LLMClient {
             "model": self.model,
             "input": text,
         });
-        let resp = self.client.post(format!("{}/v1/embeddings", self.base_url)).json(&body).send().await?;
+        let resp = self.client.post(format!("{}/v1/embeddings", self.embed_url)).json(&body).send().await?;
         let status = resp.status();
         let resp_text = resp.text().await.unwrap_or_default();
         if !status.is_success() {

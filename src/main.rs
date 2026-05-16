@@ -129,6 +129,22 @@ async fn main() -> anyhow::Result<()> {
     info!("Data Dir: {}", cfg.data_dir);
 
     let (_llm_process, llm_url) = start_llama_server(&cfg);
+    // Start embed server (0.8B model)
+    let embed_port = "8082";
+    if !std::net::TcpStream::connect("127.0.0.1:8082").is_ok() {
+        let embed_path = std::path::Path::new(&cfg.embed_model_path);
+        if embed_path.exists() {
+            warn!("Starting embed server on port {}...", embed_port);
+            std::process::Command::new(&cfg.llama_server_path)
+                .args(["-m", &cfg.embed_model_path, "--host", "127.0.0.1", "--port", embed_port,
+                       "-ngl", "0", "--ctx-size", "512", "--embeddings", "--pooling", "mean"])
+                .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+                .spawn().ok();
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        } else {
+            warn!("Embed model not found at {}, using main LLM for embeddings", cfg.embed_model_path);
+        }
+    }
 
     // Ensure data directory
     let _ = std::fs::create_dir_all(&cfg.data_dir);
@@ -148,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
 
     // API clients
     let napcat_api = Arc::new(napcat::api::NapCatApi::new(&cfg.napcat_http_url, &cfg.napcat_token));
-    let llm = Arc::new(llm::LLMClient::new(&llm_url, &cfg.llm_model));
+    let llm = Arc::new(llm::LLMClient::new(&llm_url, &cfg.embed_url, &cfg.llm_model));
 
     // Tool registry
     let tools = build_tool_registry(napcat_api.clone(), schedule_store.clone(), memory_store.clone(), note_store.clone(), llm.clone(), &cfg);
