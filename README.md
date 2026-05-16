@@ -2,18 +2,11 @@
 
 <div align="center">
 
-[中文](#) · [English](#)
+[**中文**](#lang-cn) · [English](#lang-en)
 
 </div>
 
 ---
-
-<script>
-function switchLang(lang) {
-    document.getElementById('lang-cn').style.display = lang === 'cn' ? 'block' : 'none';
-    document.getElementById('lang-en').style.display = lang === 'en' ? 'block' : 'none';
-}
-</script>
 
 <div id="lang-cn">
 
@@ -170,7 +163,11 @@ MIT License
 
 </div>
 
-<div id="lang-en" style="display:none">
+---
+
+## English
+
+<div id="lang-en">
 
 ```
 ┌───────────────────────────────────────────────────────────┐
