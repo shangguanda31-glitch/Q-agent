@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Semaphore;
 use tracing::warn;
 
 use super::traits::{Tool, ToolResult};
@@ -11,11 +12,12 @@ pub struct ClaudeCodeTool {
     timeout_secs: u64,
     max_output_bytes: usize,
     working_dir: String,
+    queue: Semaphore,
 }
 
 impl ClaudeCodeTool {
     pub fn new(timeout_secs: u64, max_output_bytes: usize, working_dir: &str) -> Arc<Self> {
-        Arc::new(Self { timeout_secs, max_output_bytes, working_dir: working_dir.to_string() })
+        Arc::new(Self { timeout_secs, max_output_bytes, working_dir: working_dir.to_string(), queue: Semaphore::new(1) })
     }
 }
 
@@ -41,6 +43,8 @@ impl Tool for ClaudeCodeTool {
     }
 
     async fn execute(&self, args: Value) -> ToolResult {
+        // Queue: only one claude_code runs at a time
+        let _permit = self.queue.acquire().await.expect("semaphore closed");
         let prompt = match args.get("prompt").and_then(|v| v.as_str()) {
             Some(p) => p,
             None => return ToolResult::fail("需要 prompt 参数"),
