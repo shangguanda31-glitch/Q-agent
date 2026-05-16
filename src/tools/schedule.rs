@@ -56,30 +56,47 @@ impl Tool for ScheduleUpdateTool {
     fn name(&self) -> &str { "schedule_update" }
 
     fn description(&self) -> &str {
-        "更新已有日程的信息。当后续消息补充了地点、参与人等详情时，用此工具将新信息追加到原有日程中。"
+        "更新已有日程的信息。当后续消息补充了地点、参与人等详情时，用此工具将新信息追加到原有日程中。优先使用 id 参数精确匹配。"
     }
 
     fn parameters_schema(&self) -> Value {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "要更新的日程标题（用于匹配）"},
-                "time": {"type": "string", "description": "要更新的日程时间（用于匹配）"},
+                "id": {"type": "string", "description": "日程 ID（精确匹配，优先于 title 匹配）"},
+                "title": {"type": "string", "description": "要更新的日程标题（用于模糊匹配）"},
+                "time": {"type": "string", "description": "要更新的日程时间（用于辅助匹配）"},
                 "info": {"type": "string", "description": "要追加的补充信息，如地点"}
             },
-            "required": ["title", "info"]
+            "required": ["info"]
         })
     }
 
     async fn execute(&self, args: Value) -> ToolResult {
-        let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let id = args.get("id").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+        let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("");
         let time = args.get("time").and_then(|v| v.as_str()).map(String::from);
         let info = args.get("info").and_then(|v| v.as_str()).unwrap_or("");
 
+        if info.is_empty() {
+            return ToolResult::fail("请提供要更新的信息");
+        }
+
         let entries = self.store.list();
-        let entry = entries.iter().find(|e| {
-            e.title == title && time.as_ref().map(|t| e.time.as_deref() == Some(t.as_str())).unwrap_or(true)
-        }).cloned();
+
+        // 优先按 ID 精确匹配
+        let entry = id.and_then(|id| entries.iter().find(|e| e.id == id).cloned())
+            .or_else(|| {
+                // 其次按标题 + 时间匹配
+                if !title.is_empty() {
+                    entries.iter().find(|e| {
+                        e.title == title
+                            && time.as_ref().map(|t| e.time.as_deref() == Some(t.as_str())).unwrap_or(true)
+                    }).cloned()
+                } else {
+                    None
+                }
+            });
 
         match entry {
             Some(e) => {
@@ -92,7 +109,10 @@ impl Tool for ScheduleUpdateTool {
                 self.store.update_description(&e.id, &new_desc);
                 ToolResult::ok(format!("已更新日程「{}」：{}", e.title, info))
             }
-            None => ToolResult::fail(format!("未找到匹配的日程「{}」", title))
+            None => {
+                let hint = if !title.is_empty() { format!("「{}」", title) } else { "".to_string() };
+                ToolResult::fail(format!("未找到匹配的日程{}", hint))
+            }
         }
     }
 }

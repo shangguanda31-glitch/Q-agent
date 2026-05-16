@@ -28,11 +28,13 @@ pub trait Tool: Send + Sync {
 - **存储**: data.db (schedules 表)
 - **时间解析**: 自动解析中文时间表达式（"明天下午5点"）
 
-### schedule_list
-n### schedule_update
+### schedule_update
 - **功能**: 更新已有日程的信息（地点等补充）
-- **参数**: `{title, time?, info}`
+- **参数**: `{id?, title?, time?, info}`（建议优先使用 id 精确匹配）
+- **匹配逻辑**: id 精确匹配 > title+time 模糊匹配
 - **用途**: 收到后续补充消息时追加到原有日程
+
+### schedule_list
 - **功能**: 查看所有日程列表
 - **参数**: 无
 
