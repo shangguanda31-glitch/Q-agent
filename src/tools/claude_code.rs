@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::Semaphore;
 use tracing::warn;
@@ -72,38 +72,14 @@ impl Tool for ClaudeCodeTool {
         };
 
         let mut child_stdout = child.stdout.take().expect("stdout piped");
-        let child_stderr = child.stderr.take().expect("stderr piped");
 
-        // Write progress to a file that the web panel can read
-        let progress_file = format!("{}/.claude_progress", self.working_dir);
-        let _ = tokio::fs::write(&progress_file, "启动 Claude Code...").await;
-
-        // Background task: read stderr line by line for progress
-        let pf = progress_file.clone();
-        let stderr_task = tokio::spawn(async move {
-            let reader = BufReader::new(child_stderr);
-            let mut lines = reader.lines();
-            let mut last_notify = std::time::Instant::now();
-            let start = std::time::Instant::now();
-
-            while let Ok(Some(line)) = lines.next_line().await {
-                // Strip ANSI escape sequences
-                let clean = strip_ansi(&line);
-                let clean = clean.trim();
-                if !clean.is_empty() {
-                    let _ = tokio::fs::write(&pf, &clean).await;
-                    if last_notify.elapsed() >= std::time::Duration::from_secs(15) {
-                        let preview: String = clean.chars().take(60).collect();
-                        let elapsed = start.elapsed().as_secs();
-                        crate::notify::send_toast(&format!("Claude Code {}s", elapsed), &preview);
-                        last_notify = std::time::Instant::now();
-                    }
-                } else if last_notify.elapsed() >= std::time::Duration::from_secs(30) {
-                    // Heartbeat: no progress for 30s
-                    let elapsed = start.elapsed().as_secs();
-                    crate::notify::send_toast(&format!("Claude Code {}s", elapsed), "处理中，请稍候...");
-                    last_notify = std::time::Instant::now();
-                }
+        // Heartbeat: periodic notifications while claude_code runs
+        let start = std::time::Instant::now();
+        let heartbeat = tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                let elapsed = start.elapsed().as_secs();
+                crate::notify::send_toast(&format!("Claude Code {}s", elapsed), "处理中，请稍候...");
             }
         });
 
@@ -115,9 +91,8 @@ impl Tool for ClaudeCodeTool {
         // Wait for process exit
         let status = child.wait().await.ok();
 
-        // Clean up progress file
-        stderr_task.abort();
-        let _ = tokio::fs::write(&progress_file, "").await;
+        // Stop heartbeat
+        heartbeat.abort();
 
         let mut stdout = String::from_utf8_lossy(&output_buf).to_string();
 
@@ -152,19 +127,3 @@ impl Tool for ClaudeCodeTool {
     }
 }
 
-/// Remove ANSI escape sequences from a string
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            while let Some(n) = chars.next() {
-                if n == 'm' { break; }
-            }
-        } else if c == '\r' {
-        } else {
-            out.push(c);
-        }
-    }
-    out.trim().to_string()
-}
