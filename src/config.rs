@@ -38,7 +38,7 @@ impl Config {
             llama_gpu_layers: std::env::var("LLAMA_GPU_LAYERS").ok().and_then(|v| v.parse().ok()).unwrap_or(99),
             max_tool_iterations: std::env::var("MAX_TOOL_ITERATIONS").ok().and_then(|v| v.parse().ok()).unwrap_or(10),
             claude_code_enabled: std::env::var("CLAUDE_CODE_ENABLED").ok().map(|v| v != "0" && v != "false").unwrap_or(true),
-            claude_code_timeout_secs: std::env::var("CLAUDE_CODE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(600),
+            claude_code_timeout_secs: std::env::var("CLAUDE_CODE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(1800),
             claude_working_dir: std::env::var("CLAUDE_WORKING_DIR").unwrap_or_else(|_| format!("{}/qq-assistant/claude_workspace", base_dir)),
             data_dir,
         }
