@@ -150,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
 ", cfg.napcat_ws_url);
     print!("[36m  │  [0mLLM     {} (9B, :8081)                    [36m│
 ", cfg.llm_model);
-    print!("[36m  │  [0mEmbed   Qwen3.5-0.8B (:8082, CPU)                        [36m│
+    print!("[36m  │  [0mEmbed   Qwen3.5-0.8B (0.8B, :8082, CPU)                        [36m│
 ");
     print!("[36m  │  [0mWeb     http://127.0.0.1:{}                            [36m│
 ", cfg.web_port);
