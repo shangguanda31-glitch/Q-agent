@@ -44,12 +44,26 @@ NapCatQQ WebSocket 接收 OneBot v11 协议消息 → 解析为统一事件 → 
     └─ 无 <tool_call> → 返回最终文本
 ```
 
-- System prompt 包含工具列表 + 相关记忆
+- System prompt 包含工具列表 + 相关记忆（语义检索 top-10）
 - 每轮携带前 20 条对话历史
-- 超过 6144 token 时自动摘要压缩（保留最后 4 条）
+- 超过 6144 token 时 LLM 摘要压缩（保留最后 4 条）
+- 中文 token 估算：`byte_len * 2 / 5`（原 `byte_len / 4` 低估一半）
 - 支持多工具同一轮调用（一次回复多个 `<tool_call>`）
+- 工具调用 JSON 解析失败时记录 warn 日志
 
-### 4. 三层记忆
+### 4. 图片处理流程
+```
+消息含图片 → 下载到 image_cache/ → 注入 OCR 提示 → LLM 决定是否调 ocr_image
+                                                      ↓
+                                           Tesseract OCR (chi_sim+eng)
+                                                      ↓
+                                          结果返回给 LLM
+```
+
+- 文件名格式：`img_{user_id}_{timestamp}_{idx}.jpg`
+- 缓存目录：`image_cache/`（相对运行目录）
+
+### 5. 三层记忆
 
 | 层级 | 实现 | 说明 |
 |------|------|------|
@@ -57,7 +71,7 @@ NapCatQQ WebSocket 接收 OneBot v11 协议消息 → 解析为统一事件 → 
 | 持久化 | SQLite（events/memories/notes） | 重启后可通过 recall/note_take 访问 |
 | 语义 | Embedding 向量（余弦相似度） | 每次消息自动生成 query embedding 搜索 |
 
-### 5. Claude Code 集成
+### 6. Claude Code 集成
 ```
 LLM 调 claude_code(prompt) → 子进程 claude -p "..." 
   → --output-format stream-json --include-partial-messages
@@ -84,43 +98,65 @@ pub trait Tool: Send + Sync {
 
 注册在 `ToolRegistry` 中，LLM 通过描述和参数 Schema 自主选择调用。
 
+### 工具清单
+
+| 工具 | 功能 | 参数 |
+|------|------|------|
+| `notify_user` | Windows Toast 通知 | title, body |
+| `schedule_create` | 创建日程 | title, time?, info? |
+| `schedule_list` | 查看日程 | 无 |
+| `schedule_update` | 更新/自动创建日程 | id?, title?, time?, info |
+| `claude_code` | Claude Code 复杂任务 | prompt |
+| `ocr_image` | Tesseract 中英文 OCR | image_path |
+| `note_take` | 记录笔记 | content, speaker, source |
+| `remember` | 语义记忆写入（含 embedding） | content |
+| `recall` | 语义记忆检索 | query |
+| `qq_read` | QQ 群信息读取 | action, group_id? |
+
 ## 存储设计
 
 SQLite WAL 模式，5 张表：
 
 | 表 | 用途 | 关键字段 |
 |----|------|---------|
-| events | 消息事件日志（最多 500 条） | time, message_type, raw_text, analysis |
+| events | 消息事件日志（最多 500 条） | time, message_type, raw_text |
 | schedules | 日程 | title, time, time_parsed, description, status |
-| memories | 语义记忆（含 embedding 向量） | content, tags, embedding |
+| memories | 语义记忆（含 1024d embedding） | content, tags, embedding |
 | notes | 笔记 | content, speaker, source, group_id |
 | exclusions | 排除列表 | exclude_type, target_id |
 
 ## 部署架构
 
 ```
-┌──────────────────────────────────────┐
-│              你的电脑                  │
-│                                      │
-│  ┌──────────┐  ┌──────────────────┐  │
-│  │ Windows  │  │ QAgent (Rust)    │  │
-│  │ Toast    │  │  Agent Loop      │  │
-│  │ 通知     │  │  Web UI :5050    │  │
-│  └──────────┘  │  SQLite          │  │
-│                └───────┬──────────┘  │
-│  ┌──────────┐  ┌───────┴──────────┐  │
-│  │ NapCatQQ │  │ llama-server     │  │
-│  │ :4447    │  │ Qwen3.5-9B :8081 │  │
-│  │ :4444    │  │ 0.8B Embed :8082 │  │
-│  └──────────┘  └──────────────────┘  │
-│                                      │
-│  ┌──────────────────────────────┐    │
-│  │ Claude Code (claude CLI)     │    │
-│  │ 讯飞星火 API (外部)          │    │
-│  └──────────────────────────────┘    │
-└──────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│                  你的电脑                      │
+│                                                │
+│  ┌────────────┐  ┌────────────────────────┐  │
+│  │ QAgent     │  │ llama-server           │  │
+│  │ Agent Loop │  │ Qwen3.5-9B  :8081      │  │
+│  │ Web :5050  │  │ Qwen3.5-0.8B :8082     │  │
+│  │ SQLite     │  │ (embedding, CPU)        │  │
+│  └─────┬──────┘  └────────────────────────┘  │
+│        │                                      │
+│  ┌─────┴──────┐  ┌────────────────────────┐  │
+│  │ NapCatQQ   │  │ Tesseract OCR           │  │
+│  │ WS :4447   │  │ tessdata/               │  │
+│  │ HTTP :4444 │  │ chi_sim+eng             │  │
+│  └────────────┘  └────────────────────────┘  │
+│                                                │
+│  ┌────────────────────────────────────────┐  │
+│  │ Claude Code (子进程)                     │  │
+│  │ claude_workspace/                       │  │
+│  │ 讯飞星火 API (外部)                     │  │
+│  └────────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
 ```
 
 ## 配置
 
-参见项目根目录 `README.md` 配置表，共 18 个环境变量。
+完整 18 个环境变量见 `README.md` 配置表，依赖详情见 `docs/technical/dependencies.md`。
+
+**关键路径：**
+- 模型文件：`LLAMA_MODEL_PATH` / `EMBED_MODEL_PATH`
+- 数据目录：`DATA_DIR`（默认 `data/`）
+- 图片缓存：`image_cache/`（运行目录下）
