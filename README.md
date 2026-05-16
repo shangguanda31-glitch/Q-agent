@@ -157,8 +157,8 @@ MIT License
 
 <div align="center">
 <a href="https://github.com/OrinVoss/Q-agent/issues">GitHub Issues</a> ·
-<a href="docs/polish-plan.md">完善计划</a> ·
-<a href="docs/vision.md">远景规划</a>
+<a href="docs/project/polish-plan.md">完善计划</a> ·
+<a href="docs/project/vision.md">远景规划</a>
 </div>
 
 </div>
@@ -297,8 +297,8 @@ MIT License
 
 <div align="center">
 <a href="https://github.com/OrinVoss/Q-agent/issues">GitHub Issues</a> ·
-<a href="docs/polish-plan.md">Polish Plan</a> ·
-<a href="docs/vision.md">Vision</a>
+<a href="docs/project/polish-plan.md">Polish Plan</a> ·
+<a href="docs/project/vision.md">Vision</a>
 </div>
 
 </div>

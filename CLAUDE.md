@@ -104,6 +104,6 @@ NapCatQQ WebSocket → Agent Loop (LLM 判断 + 工具调度) → Web 面板
 - **MEDIUM**: #16-#39 稳定性/工具/Web/LLM/配置
 - **LOW**: #40-#59 重构/测试/硬编码/重复代码
 
-完整清单：`docs/issue-list-full.md`
-完善计划：`docs/polish-plan.md`
-远景规划：`docs/vision.md`
+完整清单：`docs/issues/issue-list-full.md`
+完善计划：`docs/project/polish-plan.md`
+远景规划：`docs/project/vision.md`
