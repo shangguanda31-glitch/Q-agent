@@ -2,222 +2,553 @@
 
 **作者**: Orin Voss
 **时间线**: 2026-03-25 → 2026-05-16
-**仓库**: https://github.com/OrinVoss/Q-agent
+**仓库**: [github.com/OrinVoss/Q-agent](https://github.com/OrinVoss/Q-agent)
+**提交数**: 81 commits
+**代码**: Rust + Qwen3.5-9B + SQLite + Axum + NapCatQQ
 
 ---
 
 ## 序章：一个太宏大的开始
 
-### 2026-03-25 ｜ 起点
+### 2026-03-25 ｜ 原点
 
-下载了 `zeroclaw-master`，一个 Agent 框架参考项目。第一次接触 Agent 循环的概念——让 LLM 自己决定调用什么工具，而不是写死规则。
+下载了 `zeroclaw-master` —— 一个 Agent 框架参考项目。第一次接触 Agent 循环的概念：让 LLM 自己决定调用什么工具，而不是写死规则。
 
-开始想：能不能用这个思路做一个 QQ 助理？
+当时在想：能不能用这个思路做一个 QQ 助理？一个真正有"脑子"的助理，而不是关键词匹配的机器人。
 
-### 2026-04-13 ｜ 探索
+### 2026-04-13 ｜ 方向探索
 
-看了 `obscura-main`（另一个 Rust 项目）。这段时间大量阅读别人的实现，心里慢慢有了自己的想法。
+看了 `obscura-main`，另一个 Rust 参考项目。那段时间大量阅读别人实现，心里慢慢有了自己的想法，但还很模糊。
 
-### 2026-04-18 ｜ 第一次动笔
+### 2026-04-18 ｜ 第一次动笔：自进化 Agent
 
-写下了 `思想设计.txt`——"具备内驱力的自进化 Agent 系统"。
+写下了 `思想设计.txt` —— "具备内驱力的自进化 Agent 系统"。
 
-设计了一个非常宏大的架构：
+当时设计了一个非常宏大的架构，现在看简直异想天开：
 
-- **脑干层**：底层 OS，维持系统心跳
-- **30 分钟觉醒周期**：每半小时触发一次"自我意识"，回顾过去、审视现状、思考"我想做什么"
-- **双模态决策**：外循环处理用户请求，内循环做自我规划
-- **自进化**：能自己写新工具、新传感器、修复自己的 bug
+**脑干层（BotCoordinator）**
+底层 OS，维持系统心跳。包含"反射弧"处理极低级指令，以及一个每 30 分钟触发一次的"觉醒中断"——在觉醒期间压制所有外部输入，把算力倾斜给"自我意识"。
 
-### 2026-04-19 ｜ 定计划
+**双模态决策**
+- 外循环：处理用户输入，此时自我意识休眠
+- 内循环：30 分钟觉醒态，做三件事：
+  1. 回顾过去 30 分钟的情景记忆，提炼经验、修复报错
+  2. 审视自己的语义记忆和工具注册表
+  3. 思考"我想要做什么"——生成求知欲、能力扩张、主动社交等内驱任务
 
-写了 9200 字节的 `清单.txt`，把设计拆成六层，每一层都有详细的验证标准。
+**自进化**
+系统不仅能优化过去的规则，还能主动拓展未来的能力边界——自己写新工具、注册新传感器、爬取知识补全盲区。
 
-### 2026-04-20 ~ 04-21 ｜ 构思
+> 原话："它是一台每 30 分钟做一次白日梦的机器。在梦里，它总结自己犯的错，盘算接下来想干嘛；梦醒之后，不动声色地把梦里的想法变成现实。"
 
-`构思.txt` 里的关键词："小模型自己选择调用云端的模型"、"多层记忆系统"、"感知系统拓展性"、"统一消息流格式"。
+### 2026-04-19 ｜ 验证清单
 
-这些概念后来全部保留到了 QAgent 里——但实现方式完全不同。
+写了 `清单.txt`，9200 字节。把设计拆成六层，每一层都写了详细的验证标准。包括"反射弧处理响应时间 < 100ms"、"插队任务不丢失"等。
 
-### 2026-04-22 ~ 04-23 ｜ 准备动手
+### 2026-04-20 ~ 04-21 ｜ 关键概念沉淀
 
-看了 `llm_wiki-main`，研究 LLM 知识库方案。创建了 `sandy-agent` 项目，第一次真正尝试写代码。
+`构思.txt` 里写下了几个后来真正实现的概念：
+
+- "小模型可以自己选择调用云端的模型" → 后来 Agent 循环中 LLM 自主决定
+- "需要有多层的记忆系统" → 三层记忆：上下文 + SQLite + 语义搜索
+- "感知系统需要具有很强的拓展性" → 工具系统的设计
+- "统一消息流格式" → OneBot v11 事件标准化
+
+### 2026-04-22 ｜ LLM 知识库探索
+
+看了 `llm_wiki-main`，研究 LLM 知识库方案。想搞 RAG 但当时太复杂了，没动。
+
+### 2026-04-23 ｜ sandy-agent 开工
+
+创建了 `sandy-agent`，第一次真正写代码。用 Rust，AI 辅助。
 
 ---
 
 ## 第一章：第一次失败
 
-### 2026-04-23 ~ 05-13 ｜ sandy-agent
+### 2026-04-23 ~ 05-13 ｜ sandy-agent 的 20 天
 
-用 Rust 写，AI 辅助生成代码。结果：
+断断续续写了 20 天，结果是：
 
-- `Cargo.lock` 120KB（依赖极其复杂无法维护）
-- `CLAUDE.md` 15KB（规则多到失控）
-- 架构太宏大——想一步实现"自进化"、"觉醒周期"、"多模型协调"
-- AI 生成的代码各自为战，没有人维护整体架构
-- 想做的太多，代码根本撑不住
+- **Cargo.lock 120KB** —— 依赖多到失控
+- **CLAUDE.md 15KB** —— 规则多到没人记得住
+- **架构太宏大** —— 想一步实现"自进化"+"觉醒周期"+"多模型协调"
+- **AI 生成的代码各自为战** —— 没人维护整体架构的一致性
+- **每次改一处，碎一片** —— 没有 Rust 类型系统兜底，改一个地方崩三个
 
-### 2026-05-13 ｜ 放弃
+代码量上去了，可维护性下来了。
 
-最后一次修改 `sandy-agent`。项目烂尾。
+### 2026-05-13 ｜ 最后一次提交
 
-> **教训**：好的设计 + 失控的代码 = 零。不是设计错了，是想一次做完所有事。
+最后一次修改 sandy-agent。项目烂尾。
+
+> **核心教训**：不是设计错了，是想一次做完所有事。好的设计 + 失控的代码 = 零。
 
 ---
 
 ## 第二章：重新开始
 
-### 2026-05-15 22:00 ｜ 理念转变
+### 2026-05-15 22:00 ｜ 彻底换思路
 
-创建 `Sandy ONE` 文件夹。这一次思路完全不同：
+创建了 `Sandy ONE` 文件夹。这一次的思路完全不同：
 
 > **不做自进化、不做觉醒周期、不做自创工具。就做一件事：一个能用的 QQ 助理。**
 
-放进文件夹的只有：
-- `NapCatQQ/` — QQ 协议桥接
-- `OpenAPI.md` — NapCat API 文档
-- `local_model_provider/` — Qwen 模型文件
-- `CLAUDE.md` — 安全规范
+放进文件夹的材料很朴素：
+- `NapCatQQ/` —— QQ 协议桥接
+- `OpenAPI.md` —— NapCat 的 REST API 文档，4444 端口
+- `local_model_provider/` —— 本地的 Qwen3.5 模型文件
+- `CLAUDE.md` —— 一开始只写了安全规则
 
-然后创建 `qq-assistant/`，`cargo init`。
+然后在里面创建了 `qq-assistant/`，执行 `cargo init`。
 
-### 2026-05-15 23:00 ~ 05-16 01:37 ｜ 第一波代码
+### 2026-05-15 23:00 ~ 05-16 01:37 ｜ 第一夜
 
-独立完成：
-- Rust 项目骨架 + tokio 异步运行时
-- NapCat WebSocket + HTTP 双协议连接
-- OneBot v11 事件解析
-- 基础消息流水线
-- git 初始化
+这一夜你独自完成了：
 
-当晚踩坑：git add 把 Tesseract 大文件和 NapCat token 一起提交了。紧急修 gitignore、清 token、清理二进制。
+**项目骨架**
+```bash
+cargo init --edition 2024
+# 依赖：tokio, axum, rusqlite, reqwest, serde, tower-http, chrono
+```
 
-凌晨 1 点 37 分收工睡觉。
+**NapCat 双协议连接**
+- WebSocket :4447 —— 实时接收消息事件
+- HTTP :4444 —— 调用 API（下载文件、读群公告）
+- 配置 token 鉴权
+
+**OneBot v11 事件解析**
+- 四种消息段：text、image、at、reply
+- 三种事件类型：message、notice、request
+- serde 反序列化
+
+**基础流水线**
+```
+NapCat 事件 → broadcast channel → processor → LLM 分析 → 记录
+```
+
+**凌晨的坑**
+`git add .` 把 Tesseract 大文件（tesseract.exe、dll 几百 MB）和 NapCat token（写死在 README 里）一起提交了。
+
+紧急操作：
+1. 重写 `.gitignore`，排除 `tesseract/*.exe`、`*.dll`、`data/`、`.env`
+2. 从 README 和 docs 清除 token `NAPCAT_TOKEN_PLACEHOLDER`
+3. 从 git 历史中删除大文件
+4. 在 CLAUDE.md 加了安全规范："严禁将 token 写入文档"
+
+凌晨 1:37，commit `fd52cad` —— `init: QQ 智慧助理 v0.1`。睡觉。
 
 ---
 
 ## 第三章：一天建一座城
 
-### 05-16 10:55 ~ 13:17 ｜ 核心功能
+### 05-16 10:55 ｜ LLM 推理接入 + Agent 循环
 
-**LLM 推理（10:55）**
-接入 Qwen3.5-9B（Q4_K_M），llama-server 双进程架构：
-- 9B 跑 GPU（40层，~5-6GB）
-- 0.8B 跑 CPU（embedding，1024 维向量）
+**双进程 LLM 架构**
+```
+llama-server.exe -m Qwen3.5-9B.Q4_K_M.gguf --ctx-size 8192 -ngl 40 (端口 8081)
+llama-server.exe -m Qwen3.5-0.8B.Q6_K.gguf --ctx-size 512 -ngl 0 --embeddings --pooling mean (端口 8082)
+```
 
-**Agent 循环（10:55）**
-核心架构：Tool trait + ToolRegistry 注册体系，XML `<tool_call>` 标签驱动，最多 10 轮迭代。
+9B 跑 GPU 40 层（~5-6GB），0.8B 跑 CPU 做 embedding（1024 维）。
+
+**Agent 循环设计**
+核心抽象是 Tool trait：
 
 ```rust
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
-    fn parameters_schema(&self) -> Value;
+    fn parameters_schema(&self) -> Value;  // JSON Schema
     async fn execute(&self, args: Value) -> ToolResult;
 }
 ```
 
-首批 4 个工具：notify_user / schedule / qq_read / claude_code。
+ToolRegistry 注册所有工具，LLM 通过描述和 Schema 自主选择。
 
-**SQLite 迁移（12:26）**
-从 JSON 文件迁移到 SQLite WAL 模式。5 张表：events、schedules、memories、notes、exclusions。自动迁移旧数据。
+调用协议是通过 XML 标签：
+```xml
+<tool_call>
+{"name": "notify_user", "arguments": {"title": "提醒", "body": "开会"}}
+</tool_call>
+```
 
-**Embedding 服务器（12:41）**
-0.8B 模型独立部署在 8082，专门做语义向量搜索。1024 维，余弦相似度排序。
+每轮迭代：调 LLM → 解析响应 → 有 tool_call 就执行 → 结果回传 → 继续
+最多 10 轮，相同输出 3 次中止。
 
-**Web 面板（13:04）**
+首批 4 个工具：notify_user、schedule_create、qq_read、claude_code。
+
+**中文路径的坑**
+模型路径 `D:\桌面\编程作品\Sandy ONE\...` 含中文，llama-server 不认。建立 `D:\llm\` junction 指向 `local_model_provider` 解决。
+
+### 10:58 ｜ 编译警告清理
+
+Rust 2024 edition 的一些新 lint 触发了大量 warning。修了 unused variables 和 dead code。
+
+### 11:41 ｜ 语义记忆系统
+
+三层记忆体系：
+
+| 层级 | 载体 | 容量 | 生命周期 |
+|------|------|------|---------|
+| 上下文 | MessageHistoryStore（内存） | 每 chat_id 20 条 | 重启丢失 |
+| 持久化 | SQLite（events/memories/notes 表） | 无限制 | 永久 |
+| 语义 | Embedding 向量 + 余弦相似度 | 10 条/次召回 | 按需检索 |
+
+`remember` 工具写入时生成 embedding，`recall` 工具查询时计算相似度。
+
+### 12:26 ｜ JSON → SQLite 迁移
+
+用户问："现在用 json 存，以后数据太大怎么办？"
+
+一天之内从 JSON 文件全部迁移到 SQLite WAL 模式：
+
+```sql
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA busy_timeout=5000;
+```
+
+5 张表：events、schedules、memories、notes、exclusions。
+旧 JSON 文件自动迁移并备份为 `.bak`。
+
+### 12:41 ｜ 独立 Embedding 服务器
+
+0.8B 模型单独部署在 8082，专做向量搜索，不抢 9B 的显存。
+
+`--pooling mean` 对 embedding 做均值池化。
+
+### 13:00 ｜ 文档同步
+
+更新了 docs，记录了 SQLite 和双服务器架构。
+
+### 13:04 ｜ Web 面板
+
 Axum + SSE + 单页 HTML。5 个标签页：会话、日程、笔记、记忆、文件。
 
-**优先级队列（13:15）**
-BinaryHeap 排序：@消息 > 长文本 > 短文本。
+SSE 实时推送事件，`/events` 端点。
+
+后端 API：
+```
+GET  /api/history|schedules|notes|memories|workspace
+POST /api/schedules/done|delete
+POST /api/memories|notes/delete
+```
+
+CSS 暗色主题，GitHub 风格。CORS permissive。
+
+### 13:07 ｜ 修复日程时间没保存
+
+创建日程时只存了 title 和 info，time 字段丢了。修复 schedule_create 参数映射。
+
+### 13:15 ｜ 优先级消息队列
+
+BinaryHeap，排序规则：
+1. @消息优先
+2. 短文本优先（处理快）
+
+```
+priority = is_mentioned * 10000 + (1000 - text_len.min(999))
+```
+
+### 13:17 ｜ 修复长文本优先级
+
+排序反转了——长文本反而优先级低。修正 Ord 实现。
 
 ### 13:28 ~ 14:45 ｜ Banner 品牌化
 
-一个终端的启动横幅，改了 8 轮：
+从普通文字到最终彩色横幅，改了 8 轮。这是一个浓缩的迭代故事：
 
-| 轮次 | 内容 | 用户反馈 |
-|------|------|---------|
-| v1 | 普通文字 | "丑死了" |
-| v2 | 用户设计 ASCII art | "好" |
-| v3 | 上颜色 | "好丑" |
-| v4 | 改颜色 | "对不齐" |
-| v5 | 调对齐 | 反复调 |
-| v6 | 最终版 | 通过 |
-| v7 | 发现显示不是 QAGENT | "是QAGENT！" |
-| v8 | 命名修正 | ✅ |
+**v1**（13:28）
+普通 `println!("QAgent v0.1.0")` 
+→ 用户："丑死了"
 
-最终版：ANSI 彩色，cyan 边框，white 内容，yellow 版本号。
-
-### 14:57 ~ 15:07 ｜ 第一个用户验收
-
-你开始实际使用，发现了一堆问题：
-
-- **假执行**：LLM 输出 "✅已通知用户" 但没调 notify_user
-- **重复日程**：用户说"在五教315"，LLM 建了一条新日程而不是更新原有
-- **编造地点**：用户说"体育馆"，LLM 写成"4教312"
-- **@识别混乱**：分不清 @自己和 @别人
-
-问题根源都是 prompt 没写好。
-
-### 15:13 ~ 17:10 ｜ 密集修 bug
-
-**日程系统修复**
-- 新增 schedule_update 工具，支持 id 精确匹配
-- 加入"上下文关联"规则：连续消息是同一件事
-- 禁止因关键字错更新到其他日程
-
-**Claude Code 集成阵痛**
-
+**v2**（13:32）
+用户亲自设计了 ASCII art：
 ```
-问题 1: --max-iter 已废弃 → exit code 1 循环重试 5 次
-  修法: 改为 --effort max
+███████   █████   ██████  ███████ ███    ██ ████████
+██     ██ ██   ██ ██       ██      ████   ██    ██
+██  ██ ██ ███████ ██   ███ █████   ██ ██  ██    ██
+██   ████ ██   ██ ██    ██ ██      ██  ██ ██    ██
+██████   ██   ██  ██████  ███████ ██   ████    ██
+```
+→ 用户："好"
 
-问题 2: 超时 120s 不够
-  修法: 120s → 600s → 1800s（30分钟）
+**v3-v6**（13:39~14:36）
+添加 ANSI 颜色 → 调对齐 → 调间距 → 改颜色边框
+反复了 4 轮，用户反复说"好丑"、"对不齐"
 
-问题 3: 多进程并发冲突
-  修法: Semaphore 队列，上限 2 个并发
+**v7**（14:39）
+发现显示的是 "QAGENT" 还是 "QAGENT" 取决于 ANSI 颜色设置
+→ 用户："是QAGENT！" —— 纠正命名
 
-问题 4: 看不到进度
-  修法: stderr → 心跳 → stream-json 实时解析 thinking
+**v8**（14:41~14:44）
+最终版定型。用户手动调了两个 commit 的对齐。
+
+最终效果：cyan 边框、white 标签、yellow 版本号。
+```rust
+const C: &str = "\x1b[36m"; // cyan borders
+const W: &str = "\x1b[37m"; // white  
+const D: &str = "\x1b[2m";  // dim
+const B: &str = "\x1b[1m";  // bold
+const R: &str = "\x1b[0m";  // reset
 ```
 
-进度通知经历了 4 次重写：
-- v1：读 stderr → stderr 为空（`-p` 模式下无输出）
-- v2：30 秒心跳 → "处理中" 没有实际信息
-- v3：ANSI 剥离心跳 → 整行被过滤
-- v4：stream-json → 实时解析 thinking，每 10s 通知 ✅
+**三条平行踩坑线**
+1. **二进制锁**：每次 `cargo build --release` 都被运行中的进程锁住 → 加 `Stop-Process` 前置
+2. **端口 TIME_WAIT**：5050 被占用后不能立即重用 → 5051-5053 fallback 链
+3. **ANSI 颜色转义**：Rust 和 Python 对 `\u{001B}` 和 `\x1b` 的转义处理不同 → 统一用 const 变量
 
-**上下文压缩**
-- 中文 token 估算修正：`byte_len/4` → `byte_len*2/5`（原位 /4 低估一半）
-- 阈值调优：6144 → 4096 → 8192 → 6144（适配 8K ctx-size）
-- 语义记忆注入：从纯关键词改为 embedding 搜索
+### 14:45 ~ 14:54 ｜ README + 文档
 
-**@识别修复**
-- `[@]` → `[@我]` / `[@所有人]` / `[@QQ号]` 三级区分
-- 禁止响应 @别人的消息
-- 加入 "你给我"、"帮我" 等指令模式识别
+更新了 README 的中英文双语版本，加了语言切换按钮（用 JS，但后来发现 GitHub 不渲染 script）。
 
-**prompt 大精简**
-90 行死板规则 → 30 行原则。你说了算的那句：
+### 14:57 ｜ 第一个关键修复：上下文理解
+
+用户开始实际用，立刻发现问题。
+
+日志：
+```
+消息: 今天晚上11点钟有个事情
+→ 创建了日程
+
+消息: 我们会在4教312开会
+→ 更新到了"会议"（旧日程），不是刚创建的那个
+```
+
+LLM 因为消息里有"开会"二字，就把地点关联到了旧日程"会议"上。用户：
+> "这个不对啊，他更新错了地点"
+
+**修法**
+- 新增 `schedule_update` 工具，支持 `id` 参数精确匹配
+- 系统 prompt 加入"上下文关联"规则
+- schedule_list 返回 ID 供后续更新使用
+
+### 15:02 ｜ 通知延长
+
+Windows Toast 默认显示时间太短，改为 `duration="long"`。
+
+### 15:05 ｜ schedule_update 工具
+
+新增 `ScheduleUpdateTool`，按标题匹配 + id 精确匹配。
+
+匹配逻辑：
+```
+id 精确匹配 > title+time 模糊匹配
+```
+
+### 15:13 ｜ 修复更新错日程（第二次）
+
+第一次修完还是不行。用户说"我们会在4教312开会"，LLM 又更新到了"会议"。
+
+又发现 LLM 编造了之前的地点"六教212"——它根本没有被提到过。
+用户："六教也是存在的"（但那是别的日程的地点，不该被改）
+
+**修法**
+- 加强 prompt 规则：逐字使用用户原话
+- 移除 prompt 中的例子"在4教312开会"——这个例子本身就在诱导 LLM 输出"4教312"
+
+### 15:18 ｜ 批量消息合并
+
+两条消息同时到达时，LLM 创建了两个日程：
+```
+今天晚上12点有个事情 → 日程 A
+我们要在体育馆开个会 → 日程 B（独立创建，与 A 无关）
+```
+
+应该合并为一条。修 prompt 加入批处理规则。
+
+### 15:28 ｜ 语义自动回忆
+
+之前自动记忆读取只做关键词匹配（`LIKE %query%`），改为 embedding 语义搜索。
+
+每次消息到来时自动生成 query embedding，注入相关记忆到 system prompt。
+
+### 15:32 ｜ 禁止假执行
+
+最离谱的 bug：LLM 输出 "✅已通知用户 ✓已调用Claude Code"，但根本没输出 `<tool_call>`。
+
+```log
+LLM decided: no tool calls. Response: ✅ 已通知用户
+```
+
+这完全是在编造。修法是在 prompt 加了一句强规则：
+> **说已发送通知但没有 `<tool_call>` = 没有发送。工具不会自动执行。**
+
+### 15:37 ｜ Claude Code 第一次修
+
+`claude -p "..." --max-iter 50` 始终返回 exit code 1。
+
+折腾半天发现 `--max-iter` 在新版 Claude Code CLI 中已经废弃了，没有任何报错提示，就是默默地失败。
+
+改了 `--effort max` 就好了。但 LLM 还在不停地重试（5 次），于是加了"连续失败 2 次就放弃"的规则。
+
+### 15:40 ｜ @识别修复
+
+所有 @都显示为 `[@]`，LLM 分不清是在 @自己还是 @别人。
+
+改成：
+- `[@我]` —— @了机器人
+- `[@所有人]` —— @all
+- `[@QQ号]` —— @了别人
+
+同时加了逻辑：如果消息里 `[@QQ号]` 且不是自己，消息不是给你的，忽略。
+
+然而用户立刻发现："你说的就是你啊"——有人在群里 @别人"写报告"，LLM 无视了，但用户补了一句确认这是给他的。
+
+于是又加了指令模式识别："你给我"、"帮我"、"写一个"、"修bug"。
+
+### 15:52 ~ 16:18 ｜ Claude Code 进度 4 次重写
+
+**v1 - stderr 读取**
+启动子进程后读 stderr 行 → `claude -p` 模式下 stderr 永远为空。
+白写。
+
+**v2 - 30 秒心跳**
+每 30 秒发一次"处理中"通知 → 用户说没有实际信息，等于没有。
+
+**v3 - ANSI 剥离**
+`claude` 的输出有 ANSI 转义码，用 `contains('\x1b')` 过滤 → 整行被丢弃。
+因为 spinner 动画每行都是 ANSI 码，没有实际文字。
+
+**v4 - stream-json（最终方案）**
+改用 `--output-format stream-json --include-partial-messages --verbose`。
+JSON 流实时输出 thinking 内容。
+
+解析 `content_block_delta` 事件中的 `thinking` 字段，每 10 秒推送一次。同时检测 `tool_use_start` 事件通知用户"正在执行工具..."。
+
+最终效果：
+```
+[通知] Claude Code 10s: 用户需要我写一份环保报告，我先分析一下需求...
+[通知] Claude Code 45s: 正在Write...
+[通知] Claude Code 120s: 报告已经生成，包含五个章节...
+```
+
+### 16:11 ｜ 智能消息相关性
+
+又一次@识别问题。用户说的"修复下bug吧，他对方不下棋啊。你给我搞一个有前后端的"——没有 @，但明显是在跟助理说话。
+
+LLM 无视了。用户补了一句"说的就是你啊"。
+
+修法：prompt 加入"你给我"、"帮我"等指令模式识别 + 上下文连续性。
+
+### 16:13 ｜ Prompt 大精简
+
+用户一句话说到了点子上：
 
 > "你这个prompt也太死板了吧"
 
-删了所有"必须/禁止/错误的例子"，保留核心约束：不编造、真调用、去重。
+90 行的死板规则手册，砍到 30 行原则式指导。
+
+**删除的（80 行）：**
+- "禁止编造与假执行"章节
+- "错误的例子：✅通知用户 ✓已调用Claude Code"
+- "正确的做法：先输出 <tool_call>"
+- "收到 @你的消息时必须 notify_user"
+- "重要紧急消息必须 notify_user"
+- 等等
+
+**保留的（7 条）：**
+- 只能读取不能发送
+- 用你的判断力
+- 说要做的事必须用工具做
+- 不要编造信息
+- 创建/更新日程时 notify_user
+- 收到 @时 notify_user
+- claude_code 失败 2 次放弃
+
+### 16:18 ｜ stream-json 最终版
+
+合并前几次经验，最终确定为 stream-json 方案。
+
+同时将超时一路从 120s → 600s → 1800s（30 分钟）。
+
+### 17:06 ~ 17:10 ｜ 上下文压缩调优
+
+中文 token 估算问题：
+```
+byte_len / 4  →  每中文字符算 0.75 token
+实际每中文约 1.5-2 token，低估了一半
+```
+
+修正为 `byte_len * 2 / 5`。
+
+阈值来回调：
+- 初始：6144（合理但有溢出风险）
+- 改 4096（太早触发压缩）
+- 改 8192（用户试了）
+- 回到 6144（适配 8K ctx-size + 8G 显存）
 
 ### 18:18 ~ 18:34 ｜ 排除列表
 
-新增 ExclusionStore + Web UI 管理，SQLite 持久化。Web 面板上 🟢/🔴 点击切换排除状态。
+用户 84 个 QQ 群，Agent 全部处理。很多群里的"支持休闲""游泳小心"等消息也走 LLM。
 
-### 19:37 ~ 20:12 ｜ 收尾
+新增 ExclusionStore + Web UI 管理。NapCat API 拉取群列表，Web 面板上 🟢/🔴 点击切换。
 
-- README 更新
-- CLAUDE.md 更新
-- 项目介绍页面（docs/index.html）
-- 移除硬编码的个人路径
-- 中文时间解析增强（支持后天、下周三、5月20号、点半）
-- 清理无用代码
-- 修复语言切换
+Agent 循环中查 SQLite 判断是否跳过。
+
+```sql
+CREATE TABLE exclusions (exclude_type TEXT, target_id INTEGER);
+```
+
+### 18:46 ~ 19:37 ｜ 问题追踪系统
+
+基于代码质量扫描报告创建了 50 个 GitHub Issues：
+
+- CRITICAL #10：PowerShell 命令注入
+- HIGH #11-#15：安全/Panic/泄漏/数据/兼容
+- MEDIUM #16-#39：WebSocket/LLM/工具/配置
+- LOW #40-#59：重构/测试/硬编码
+
+在 CLAUDE.md 中建立了完整的 Issue 优先级清单。
+
+### 19:39 ｜ 项目介绍页
+
+`docs/index.html` —— 粒子动画背景的项目介绍页面。
+
+### 19:43 ｜ 移除硬编码路径
+
+从 sandy-agent 时代留下的个人路径：
+```rust
+// 之前
+"PROJECT_ROOT_PLACEHOLDER/qq-assistant/tesseract/tesseract.exe"
+"LLM_DIR_PLACEHOLDERmodels/Qwen3.5-9B.Q4_K_M.gguf"
+
+// 之后  
+"tesseract/tesseract.exe"  // 相对路径
+"models/qwen3.5-9b-q4_k_m.gguf"  // 相对路径
+```
+
+所有路径改为环境变量 + 相对路径，任何人 clone 后不用改代码就能跑。
+
+### 19:46 ｜ 中文时间解析增强
+
+从简陋的 5 行代码：
+```rust
+fn try_parse_time(s: &str) -> Option<String> {
+    // 只支持"明天下午3点"这种
+}
+```
+
+扩展到 90 行，支持：
+- 下周三下午5点、本周五、周二
+- 后天、大后天
+- 5 月 20 号
+- 点半、一刻、三刻
+- 上午、下午、晚上、凌晨、傍晚、中午
+
+### 19:47 ｜ 清理无用代码
+
+删除了 `analyze()`、`analyze_with_image()`、`analyze_inner()` 三个函数和 42 行的 SYSTEM_PROMPT——都是早期流水线时代的残留。
+
+### 20:02 ｜ 最后修复
+
+- OCR 错误提示中的硬编码路径
+- Dispatcher 解析失败时记录 warn 日志（原来是静默丢弃）
+
+### 20:06 ~ 20:12 ｜ 收尾
+
+更新 README 配置表——从 8 个变量补全到 18 个。修复语言切换按钮（script 被 GitHub 过滤 → 锚点跳转）。更新 docs 结构。
 
 ---
 
@@ -225,25 +556,49 @@ BinaryHeap 排序：@消息 > 长文本 > 短文本。
 
 | 指标 | 值 |
 |------|-----|
-| 开发天数 | 53 天（含设计）+ 2 天（编码）|
-| Commits | 81 |
+| 设计周期 | 2026-03-25 → 04-23（30 天）|
+| 第一次实现 | 2026-04-23 → 05-13（20 天，失败）|
+| 第二次实现 | 2026-05-15 22:00 → 05-16 20:12（约 22 小时）|
+| 总 Commits | 81 |
 | Changelogs | 40+ |
-| GitHub Issues | 50（10 CRITICAL/HIGH ~ 39 MEDIUM ~ 1 LOW）|
-| 代码行 | Rust 后端 |
-| 工具 | 10 个 |
-| LLM | Qwen3.5-9B Q4_K_M @ 42-48 t/s |
-| 上下文 | 8K tokens |
-| 存储 | SQLite WAL |
-| 失败次数 | 1（sandy-agent 烂尾）|
+| GitHub Issues | 50 |
+| 工具数量 | 10 |
+| 代码语言 | Rust |
+| LLM | Qwen3.5-9B Q4_K_M @ 42-48 token/s |
+| 上下文 | 8192 tokens |
+| 存储 | SQLite WAL（5 表）|
+| Web | Axum + SSE + SPA |
+| Claude Code | stream-json，1800s 超时，2 并发 |
+| 失败次数 | 1（sandy-agent）|
 
-## 关键词
+## 用户原声
 
-> "不是模型不行，是我 prompt 没写好"
-> "是QAGENT！"
-> "完成度很差！1. 不能回消息 2. 太多临时修补 3. 上下文管理粗糙"
-> "Claude code是万能的！！用来处理复杂的任务"
-> "你这个prompt也太死板了吧"
+> "使用shadowsocks克隆https://github.com/NapNeko/NapCatQQ" —— 项目导火索
+>
+> "完成度很差！1. 不能回消息 2. 太多临时修补 3. 上下文管理粗糙" —— 第一个验收反馈
+>
+> "是QAGENT！" —— 纠正命名
+>
+> "丑死了" / "好丑" —— Banner 迭代中的经典评价
+>
+> "这个不对啊，他更新错了地点" —— 日程更新 bug
+>
+> "六教也是存在的" —— LLM 编造地点事件
+>
+> "z也不对啊" —— 另一个 bug
+>
+> "你说的就是你啊" —— 消息相关性判断
+>
+> "你这个prompt也太死板了吧" —— 触发 prompt 大重构的关键反馈
+>
+> "Claude code是万能的！！用来处理复杂的任务" —— 集成 Claude Code 的原因
+>
+> "没有给我发进度" —— Claude Code 进度通知需求
+>
+> "不是模型不行，是我 prompt 没写好" —— 核心领悟
 
 ---
 
 *从自进化觉醒周期，到一个能用的 QQ 助理。删掉 90% 的想法，把 10% 做到极致。*
+
+**两次尝试，一次失败，一次成功。差的不只是代码，是"想做什么"和"能做什么"之间的距离。**
