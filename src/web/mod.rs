@@ -5,8 +5,9 @@ use std::convert::Infallible;
 use tokio::sync::broadcast;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 
-use crate::store::{EventStore, ScheduleStore, ScheduleEntry, NoteStore, MemoryStore, NoteEntry, MemoryEntry};
+use crate::store::{EventStore, ScheduleStore, ScheduleEntry, NoteStore, MemoryStore, NoteEntry, MemoryEntry, ExclusionStore, ExclusionEntry};
 use crate::napcat::types::ProcessedEvent;
+use crate::napcat::api::NapCatApi;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -15,6 +16,8 @@ pub struct AppState {
     pub sched: Arc<ScheduleStore>,
     pub notes: Arc<NoteStore>,
     pub memories: Arc<MemoryStore>,
+    pub exclusions: Arc<ExclusionStore>,
+    pub napcat: Arc<NapCatApi>,
 }
 
 pub fn router(
@@ -23,8 +26,10 @@ pub fn router(
     sched: Arc<ScheduleStore>,
     notes: Arc<NoteStore>,
     memories: Arc<MemoryStore>,
+    exclusions: Arc<ExclusionStore>,
+    napcat: Arc<NapCatApi>,
 ) -> Router {
-    let state = AppState { event_tx, store, sched, notes, memories };
+    let state = AppState { event_tx, store, sched, notes, memories, exclusions, napcat };
     Router::new()
         .route("/", get(index))
         .route("/events", get(sse_handler))
@@ -41,6 +46,12 @@ pub fn router(
         .route("/api/memories/delete", post(memory_delete))
         .route("/api/notes/delete", post(note_delete))
         .nest_service("/workspace_files", ServeDir::new("claude_workspace"))
+        // Exclusion management
+        .route("/api/exclusions", get(exclusion_list))
+        .route("/api/exclusions/add", post(exclusion_add))
+        .route("/api/exclusions/remove", post(exclusion_remove))
+        // Chat sources
+        .route("/api/chat-sources", get(chat_sources))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -105,4 +116,52 @@ async fn memory_delete(State(state): State<AppState>, Json(req): Json<IdReq>) ->
 }
 async fn note_delete(State(state): State<AppState>, Json(req): Json<IdReq>) -> Json<serde_json::Value> {
     Json(serde_json::json!({"ok": state.notes.delete(&req.id)}))
+}
+
+// === Exclusion handlers ===
+
+async fn exclusion_list(State(state): State<AppState>) -> Json<Vec<ExclusionEntry>> {
+    Json(state.exclusions.list())
+}
+
+#[derive(serde::Deserialize)]
+struct ExclusionReq {
+    exclude_type: String, // "group" or "user"
+    target_id: i64,
+    note: Option<String>,
+}
+
+async fn exclusion_add(State(state): State<AppState>, Json(req): Json<ExclusionReq>) -> Json<serde_json::Value> {
+    let ok = state.exclusions.add(&req.exclude_type, req.target_id, req.note.as_deref().unwrap_or(""));
+    Json(serde_json::json!({"ok": ok}))
+}
+
+async fn exclusion_remove(State(state): State<AppState>, Json(req): Json<ExclusionReq>) -> Json<serde_json::Value> {
+    let ok = state.exclusions.remove(&req.exclude_type, req.target_id);
+    Json(serde_json::json!({"ok": ok}))
+}
+
+// === Chat sources (groups + friends from NapCat) ===
+
+async fn chat_sources(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let groups = state.napcat.get_group_list().await;
+    let friends = state.napcat.get_friend_list().await;
+    let excluded: std::collections::HashSet<(String, i64)> = state.exclusions.list().into_iter()
+        .map(|e| (e.exclude_type, e.target_id)).collect();
+
+    let group_list: Vec<serde_json::Value> = groups.iter().map(|g| {
+        let id = g.get("group_id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let name = g.get("group_name").and_then(|v| v.as_str()).unwrap_or("未知群").to_string();
+        let excluded = excluded.contains(&("group".to_string(), id));
+        serde_json::json!({"id": id, "name": name, "type": "group", "excluded": excluded})
+    }).collect();
+
+    let friend_list: Vec<serde_json::Value> = friends.iter().map(|f| {
+        let id = f.get("user_id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let name = f.get("nickname").or_else(|| f.get("remark")).and_then(|v| v.as_str()).unwrap_or("未知好友").to_string();
+        let excluded = excluded.contains(&("user".to_string(), id));
+        serde_json::json!({"id": id, "name": name, "type": "user", "excluded": excluded})
+    }).collect();
+
+    Json(serde_json::json!({"groups": group_list, "friends": friend_list}))
 }

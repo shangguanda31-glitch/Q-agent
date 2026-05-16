@@ -16,7 +16,8 @@ fn open_db(path: &str) -> parking_lot::Mutex<Connection> {
         "CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,time TEXT,message_type TEXT,group_id INTEGER,user_id INTEGER,sender_name TEXT,raw_text TEXT,has_image INTEGER,image_urls TEXT,has_file INTEGER,file_name TEXT,analysis TEXT,raw_json TEXT);
          CREATE TABLE IF NOT EXISTS schedules(id TEXT PRIMARY KEY,title TEXT,time TEXT,time_parsed TEXT,description TEXT,source TEXT,source_user TEXT,status TEXT,created_at TEXT);
          CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY,content TEXT,tags TEXT,source TEXT,created_at TEXT,embedding TEXT);
-         CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,content TEXT,speaker TEXT,speaker_id INTEGER,source TEXT,group_id INTEGER,message_time TEXT,created_at TEXT);"
+         CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,content TEXT,speaker TEXT,speaker_id INTEGER,source TEXT,group_id INTEGER,message_time TEXT,created_at TEXT);
+         CREATE TABLE IF NOT EXISTS exclusions(id INTEGER PRIMARY KEY AUTOINCREMENT,exclude_type TEXT NOT NULL,target_id INTEGER NOT NULL,note TEXT,created_at TEXT,UNIQUE(exclude_type,target_id));"
     ).ok();
     parking_lot::Mutex::new(conn)
 }
@@ -255,6 +256,63 @@ impl NoteStore {
     }
     pub fn delete(&self, id: &str) -> bool {
         self.0.lock().execute("DELETE FROM notes WHERE id=?1", params![id]).ok().is_some()
+    }
+}
+
+// === Exclusion Store ===
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExclusionEntry {
+    pub id: i64,
+    pub exclude_type: String,
+    pub target_id: i64,
+    pub note: String,
+    pub created_at: String,
+}
+
+pub struct ExclusionStore(parking_lot::Mutex<Connection>);
+
+impl ExclusionStore {
+    pub fn new(data_dir: &str) -> Self {
+        let dir = PathBuf::from(data_dir);
+        std::fs::create_dir_all(&dir).ok();
+        let db = open_db(&dir.join("data.db").to_string_lossy());
+        Self(db)
+    }
+
+    pub fn list(&self) -> Vec<ExclusionEntry> {
+        let conn = self.0.lock();
+        let mut stmt = conn.prepare("SELECT id,exclude_type,target_id,note,created_at FROM exclusions ORDER BY exclude_type,target_id").unwrap();
+        let mut out = Vec::new();
+        if let Ok(rows) = stmt.query_map([], |r| Ok(ExclusionEntry {
+            id: r.get(0)?, exclude_type: r.get(1)?, target_id: r.get(2)?,
+            note: get_str(r, 3), created_at: get_str(r, 4),
+        })) {
+            for row in rows { if let Ok(e) = row { out.push(e); } }
+        }
+        out
+    }
+
+    pub fn add(&self, exclude_type: &str, target_id: i64, note: &str) -> bool {
+        self.0.lock().execute(
+            "INSERT OR IGNORE INTO exclusions(exclude_type,target_id,note,created_at) VALUES(?1,?2,?3,?4)",
+            params![exclude_type, target_id, note, chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string()],
+        ).is_ok()
+    }
+
+    pub fn remove(&self, exclude_type: &str, target_id: i64) -> bool {
+        self.0.lock().execute(
+            "DELETE FROM exclusions WHERE exclude_type=?1 AND target_id=?2",
+            params![exclude_type, target_id],
+        ).is_ok()
+    }
+
+    pub fn is_excluded(&self, exclude_type: &str, target_id: i64) -> bool {
+        self.0.lock().query_row(
+            "SELECT COUNT(*) FROM exclusions WHERE exclude_type=?1 AND target_id=?2",
+            params![exclude_type, target_id],
+            |r| r.get::<_, i64>(0),
+        ).unwrap_or(0) > 0
     }
 }
 

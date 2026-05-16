@@ -12,7 +12,7 @@ use crate::llm::{LLMClient, AgentMessage};
 use crate::napcat::api::NapCatApi;
 use crate::napcat::types::{OneBotEvent, ProcessedEvent, MessageEvent};
 use crate::notify;
-use crate::store::{EventStore, ScheduleStore, ChatMessage, MemoryStore};
+use crate::store::{EventStore, ScheduleStore, ChatMessage, MemoryStore, ExclusionStore};
 use crate::tools::traits::ToolRegistry;
 
 /// A queued message with priority
@@ -48,8 +48,7 @@ pub async fn run(
     max_iterations: usize,
     chat_history: Arc<crate::store::MessageHistoryStore>,
     memory_store: Arc<MemoryStore>,
-    excluded_groups: Vec<i64>,
-    excluded_users: Vec<i64>,
+    exclusion_store: Arc<ExclusionStore>,
 ) {
     let (tx, mut rx_queue) = tokio::sync::mpsc::unbounded_channel::<OneBotEvent>();
 
@@ -107,8 +106,8 @@ pub async fn run(
         // Process highest priority message
         while let Some(qmsg) = queue.pop() {
             // Exclusion check: skip if group or user is in the excluded list
-            let is_excluded = qmsg.msg.group_id.map(|g| excluded_groups.contains(&g)).unwrap_or(false)
-                || excluded_users.contains(&qmsg.msg.user_id);
+            let is_excluded = qmsg.msg.group_id.map(|g| exclusion_store.is_excluded("group", g)).unwrap_or(false)
+                || exclusion_store.is_excluded("user", qmsg.msg.user_id);
             if is_excluded {
                 info!("Skipped excluded message from group:{:?} user:{}", qmsg.msg.group_id, qmsg.msg.user_id);
                 continue;
