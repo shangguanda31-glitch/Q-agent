@@ -123,43 +123,25 @@ async fn main() -> anyhow::Result<()> {
             let cfg = config::Config::from_env();
 
     let ver = env!("CARGO_PKG_VERSION");
+    let (C, Y, R) = ("[36m", "[33m", "[0m");
     println!();
-    print!("[36m  ┌───────────────────────────────────────────────────────────┐
-");
-    print!("[36m  │                                                           │
-");
-    print!("[36m  │     ███████   █████   ██████  ███████ ███    ██ ████████ │
-");
-    print!("[36m  │    ██     ██ ██   ██ ██       ██      ████   ██    ██    │
-");
-    print!("[36m  │    ██  ██ ██ ███████ ██   ███ █████   ██ ██  ██    ██    │
-");
-    print!("[36m  │    ██   ████ ██   ██ ██    ██ ██      ██  ██ ██    ██    │
-");
-    print!("[36m  │     ██████   ██   ██  ██████  ███████ ██   ████    ██    │
-");
-    print!("[36m  │                                                           │
-");
-    print!("[33m  │                          v0.1.0                           │
-");
-    print!("[36m  │                                                           │
-");
-    print!("[36m  ├───────────────────────────────────────────────────────────┤
-");
-    print!("[36m  │  [0mNapCat  {}                              [36m│
-", cfg.napcat_ws_url);
-    print!("[36m  │  [0mLLM     {} (9B, :8081)                    [36m│
-", cfg.llm_model);
-    print!("[36m  │  [0mEmbed   Qwen3.5-0.8B (:8082, CPU)                        [36m│
-");
-    print!("[36m  │  [0mWeb     http://127.0.0.1:{}                            [36m│
-", cfg.web_port);
-    print!("[36m  │  [0mData    ./data                                           [36m│
-");
-    print!("[36m  └───────────────────────────────────────────────────────────┘
-");
-    print!("[0m
-");
+    println!("{C}  ┌────────────────────────────────────────────────────────────┐{R}");
+    println!("{C}  │ {R} █████ █████  ████  █████ █   █ █████  {C}│{R}");
+    println!("{C}  │ {R}█   █ █   █ █     █     ██  █   █    {C}│{R}");
+    println!("{C}  │ {R}█   █ █████ █ ██  ████  █ █ █   █    {C}│{R}");
+    println!("{C}  │ {R}█ █ █ █   █ █   █ █     █  ██   █    {C}│{R}");
+    println!("{C}  │ {R} ███  █   █  ███  █████ █   █   █    {C}│{R}");
+    println!("{C}  │                                                              │{R}");
+    println!("{C}  │  {Y}                        v{}                         {C}│{R}",        ver);
+    println!("{C}  │                                                              │{R}");
+    println!("{C}  ├────────────────────────────────────────────────────────────┤{R}");
+    println!("{C}  │  {R}NapCat  {}                                 {C}│{R}", cfg.napcat_ws_url);
+    println!("{C}  │  {R}LLM     {} (9B, :8081)                       {C}│{R}", cfg.llm_model);
+    println!("{C}  │  {R}Embed   Qwen3.5-0.8B (:8082, CPU)                           {C}│{R}");
+    println!("{C}  │  {R}Web     http://127.0.0.1:{}                               {C}│{R}", cfg.web_port);
+    println!("{C}  │  {R}Data    ./data                                              {C}│{R}");
+    println!("{C}  └────────────────────────────────────────────────────────────┘{R}");
+    println!();
 
     let (_llm_process, llm_url) = start_llama_server(&cfg);
     // Start embed server (0.8B model)
