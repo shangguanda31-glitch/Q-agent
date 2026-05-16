@@ -120,13 +120,34 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|_| "qq_assistant=info".into()))
         .init();
 
-    let cfg = config::Config::from_env();
-    info!("=== QQ 智慧助理 ===");
-    info!("NapCat WS: {}", cfg.napcat_ws_url);
-    info!("NapCat HTTP: {}", cfg.napcat_http_url);
-    info!("LLM: {} (model: {})", cfg.llm_url, cfg.llm_model);
-    info!("Web Panel: http://127.0.0.1:{}", cfg.web_port);
-    info!("Data Dir: {}", cfg.data_dir);
+        let cfg = config::Config::from_env();
+
+    println!(r#"
+╭─────────────────────────────────────────────────────────────╮
+│                                                             │
+│       ██████  ███████         █████  ██████  ███████ ███    │
+│      ██       ██             ██   ██ ██   ██ ██      ██    │
+│      ██   ███ █████   █████  ███████ ██████  █████   ██    │
+│      ██    ██ ██             ██   ██ ██   ██ ██      ██    │
+│       ██████  ███████        ██   ██ ██   ██ ███████ ███    │
+│                                                             │
+│                                      v{}
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  NapCat  {:40} │
+│  LLM     {:40} │
+│  Embed   {:40} │
+│  Web     {:40} │
+│  Data    {:40} │
+╰─────────────────────────────────────────────────────────────╯
+"#,
+    env!("CARGO_PKG_VERSION"),
+    cfg.napcat_ws_url,
+    format!("{} (9B, :8081)", cfg.llm_model),
+    "Qwen3.5-0.8B (:8082, CPU)",
+    format!("http://127.0.0.1:{}", cfg.web_port),
+    cfg.data_dir,
+    );
 
     let (_llm_process, llm_url) = start_llama_server(&cfg);
     // Start embed server (0.8B model)
