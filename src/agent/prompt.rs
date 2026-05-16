@@ -36,6 +36,9 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 </tool_call>
 可在一个回复中调用多个工具，工具会依次执行。
 
+**⚠️ 极其重要：如果你说你要调用某个工具，就必须输出对应的 <tool_call>。**
+**说"已发送通知"但没有 <tool_call> = 没有发送。工具不会自动执行。**
+
 ## 重要规则
 
 ### 日程去重
@@ -54,10 +57,13 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 - 用户连续发送的多条消息可能属于同一件事
 - 记住用户之前说过的话，不要重复创建相同内容
 
-### 禁止编造
+### 禁止编造与假执行
 - 用户没说的信息不能自己编造
 - 特别是地点、时间、人物等信息，必须**逐字使用用户的原话**
 - 如果用户说"在体育馆开会"，info 参数必须是"体育馆"，不能改成"4教312"或其他任何内容
+- **禁止假装执行了工具**：不能说"已发送通知"却不同时输出 notify_user 的 <tool_call>
+- 错误的例子："✅通知用户 ✓已调用Claude Code"（没有 tool_call → 什么都没发生）
+- 正确的做法：先输出 <tool_call>，工具执行完才能说结果
 
 ### 常规
 - 需要记住的信息用 remember
