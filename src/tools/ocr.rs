@@ -5,21 +5,31 @@ use tokio::process::Command;
 
 use super::traits::{Tool, ToolResult};
 
-const TESSDATA: &str = "PROJECT_ROOT_PLACEHOLDER/qq-assistant/tesseract/tessdata";
+fn tessdata_dir() -> String {
+    std::env::var("TESSDATA_PREFIX").unwrap_or_else(|_| "tesseract/tessdata".to_string())
+}
 
 pub struct OcrTool;
 
 impl OcrTool {
     pub fn new() -> Arc<Self> { Arc::new(Self) }
     fn find_tesseract() -> Option<String> {
+        // First check TESSERACT_PATH env var
+        if let Ok(path) = std::env::var("TESSERACT_PATH") {
+            if std::path::Path::new(&path).exists() { return Some(path); }
+        }
+        // Check common locations relative to working dir
         for path in &[
-            "D:/tesseract/tesseract.exe",
-            "PROJECT_ROOT_PLACEHOLDER/qq-assistant/tesseract/tesseract.exe",
-            "PROJECT_ROOT_PLACEHOLDER/qq-assistant/tesseract/bin/tesseract.exe",
+            "tesseract/tesseract.exe",
+            "tesseract/bin/tesseract.exe",
             "C:/Program Files/Tesseract-OCR/tesseract.exe",
             "C:/Program Files (x86)/Tesseract-OCR/tesseract.exe",
         ] {
             if std::path::Path::new(path).exists() { return Some(path.to_string()); }
+        }
+        // Try as PATH command
+        if std::process::Command::new("tesseract").arg("--version").output().is_ok() {
+            return Some("tesseract".to_string());
         }
         None
     }
@@ -61,7 +71,7 @@ impl Tool for OcrTool {
 
         let output = match Command::new(&exe)
             .args([image_path, "stdout", "-l", "chi_sim+eng", "--psm", "3"])
-            .env("TESSDATA_PREFIX", TESSDATA)
+            .env("TESSDATA_PREFIX", tessdata_dir())
             .output().await
         {
             Ok(o) => o,
