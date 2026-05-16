@@ -548,7 +548,31 @@ fn try_parse_time(s: &str) -> Option<String> {
 
 ### 20:06 ~ 20:12 ｜ 收尾
 
-更新 README 配置表——从 8 个变量补全到 18 个。修复语言切换按钮（script 被 GitHub 过滤 → 锚点跳转）。更新 docs 结构。
+更新 README 配置表——从 8 个变量补全到 18 个。修复语言切换按钮（script 被 GitHub 过滤 → 锚点跳转）。更新 docs 结构并分类归档。
+
+### 20:30 ~ 20:45 ｜ Banner 对齐修复
+
+LLM 模型名从 `Qwen3.5-9B-Q4_K_M` 改为 `Qwen3.5-9b` 后 banner 对不齐。用 Python 精确测量每行字符数，确保全部 59 字符严格对齐。
+
+### 20:50 ~ 21:02 ｜ OCR 路径修复
+
+Tesseract 从 `target/release/` 运行时找不到语言数据。`TESSDATA_PREFIX` 默认值 `tesseract/tessdata` 是相对路径，运行时指向 `target/release/tesseract/tessdata/` 不存在，Tesseract 静默返回空结果。
+
+修法：改用 `CARGO_MANIFEST_DIR` 编译时常量构造绝对路径。
+
+同时修复图片文件名冲突——同一用户连续发图时，文件名 `img_{user_id}_{idx}.jpg` 导致第二张覆盖第一张。加入时间戳：`img_{user_id}_{timestamp}_{idx}.jpg`。
+
+### 21:10 ｜ 依赖文档
+
+创建 `docs/technical/dependencies.md`，涵盖所有依赖详情：Rust crate 版本、llama.cpp 参数、Qwen 模型规格、NapCatQQ API、Tesseract 配置、Claude Code 配置、SQLite 表结构、全部 18 个环境变量。
+
+### 21:20 ｜ 会话历史持久化（Issue #36）
+
+原来 `MessageHistoryStore` 纯内存，重启后 LLM 失去所有上下文。新增 `chat_history` SQLite 表，push 时同时写入内存和数据库，启动时自动 load 回内存。
+
+### 21:30 ｜ Claude Code 终止标记
+
+LLM 搞不清 claude_code 是否完成，会重复调用。在工具返回值末尾追加 `---\n任务已完成`，LLM 读到就知道该结束了。
 
 ---
 
@@ -559,7 +583,7 @@ fn try_parse_time(s: &str) -> Option<String> {
 | 设计周期 | 2026-03-25 → 04-23（30 天）|
 | 第一次实现 | 2026-04-23 → 05-13（20 天，失败）|
 | 第二次实现 | 2026-05-15 22:00 → 05-16 20:12（约 22 小时）|
-| 总 Commits | 81 |
+| 总 Commits | 90+ |
 | Changelogs | 40+ |
 | GitHub Issues | 50 |
 | 工具数量 | 10 |
