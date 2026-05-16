@@ -183,7 +183,8 @@ async fn handle_message(
     let user_prompt = format!("消息来源: {}\n发送者: {}({})\n消息内容: {}{}", source, sender_name, msg.user_id, raw_text, mention_prefix);
 
     info!("Agent processing message from {}: {}", sender_name, &raw_text.chars().take(80).collect::<String>());
-    let memory_context = memory_store.load_context(&raw_text, 10);
+    let query_emb = llm.embed(&raw_text).await.ok();
+    let memory_context = memory_store.load_context(query_emb.as_deref(), &raw_text, 10);
     let system_prompt = crate::agent::prompt::build_system_prompt(&tools, &memory_context);
 
     let mut messages: Vec<AgentMessage> = Vec::new();
