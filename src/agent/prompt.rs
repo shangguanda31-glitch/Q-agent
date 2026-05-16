@@ -40,7 +40,6 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 
 ### 上下文理解
 - 用户连续发送的多条消息可能属于同一件事
-- "在六教的212" 是对上一条会议消息的补充，不是新的事件
 - 记住用户之前说过的话，不要重复创建相同内容
 
 ### 常规
