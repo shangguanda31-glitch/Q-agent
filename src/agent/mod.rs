@@ -78,11 +78,11 @@ async fn handle_message(
             "image" => { has_image = true; text_parts.push("[图片]".to_string()); }
             "file" => {
                 file_name = seg.file_name().or_else(|| {
-                    seg.data.as_ref().and_then(|d| d.get("file_id")).and_then(|v| v.as_str().map(String::from))
-                        .or_else(|| seg.data.as_ref().and_then(|d| d.get("fid")).and_then(|v| v.as_str().map(String::from)))
+                    seg.data.as_ref().and_then(|d| d.get("file")).and_then(|v| v.as_str().map(String::from))
+                        .or_else(|| seg.data.as_ref().and_then(|d| d.get("name")).and_then(|v| v.as_str().map(String::from)))
                 });
                 let fname = file_name.as_deref().or_else(|| {
-                    seg.data.as_ref().and_then(|d| d.get("file_id")).and_then(|v| v.as_str())
+                    seg.data.as_ref().and_then(|d| d.get("file")).and_then(|v| v.as_str())
                 }).unwrap_or("文件");
                 text_parts.push(format!("[{}]", fname));
             }

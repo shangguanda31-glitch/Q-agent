@@ -22,3 +22,5 @@ async-stream = "0.3"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 dotenvy = "0.15"
+rusqlite = { version = "0.31", features = ["bundled"] }
+parking_lot = "0.12"
