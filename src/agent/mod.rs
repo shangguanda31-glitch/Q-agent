@@ -162,10 +162,21 @@ async fn handle_message(
             "at" => {
                 if let Some(qq) = seg.data.as_ref().and_then(|d| d.get("qq")).and_then(|v| v.as_str()) {
                     if let Some(self_id) = msg.self_id {
-                        if qq == &self_id.to_string() || qq == "all" { is_mentioned = true; }
+                        if qq == &self_id.to_string() {
+                            is_mentioned = true;
+                            text_parts.push("[@我]".to_string());
+                        } else if qq == "all" {
+                            is_mentioned = true;
+                            text_parts.push("[@所有人]".to_string());
+                        } else {
+                            text_parts.push(format!("[@{}]", qq));
+                        }
+                    } else {
+                        text_parts.push(format!("[@{}]", qq));
                     }
+                } else {
+                    text_parts.push("[@]".to_string());
                 }
-                text_parts.push("[@]".to_string());
             }
             "face" | "mface" => text_parts.push("[表情]".to_string()),
             _ => text_parts.push(format!("[{}]", seg.segment_type)),

@@ -50,8 +50,14 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 ### 通知用户
 - 创建日程时必须同时调用 notify_user 通知用户
 - **更新日程时也必须通知用户**
-- 收到 @你的消息时必须 notify_user
+- 收到 [@我] 或 [@所有人] 的消息时必须 notify_user
+- [@123456] 表示 @了别人，不是你，这种可以忽略
 - 重要紧急消息必须 notify_user
+
+### 进度反馈
+- 调用 claude_code 前必须先 notify_user 告知任务已开始
+- 调用 claude_code 后尽快用 notify_user 告知用户结果摘要
+- 不要让用户长时间无反馈
 
 ### 上下文理解
 - 用户连续发送的多条消息可能属于同一件事
