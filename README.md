@@ -1,4 +1,4 @@
-# Q-Agent · QQ 智慧助理
+# QAgent · QQ 智慧助理
 
 [English](#english) | [中文](#中文)
 
@@ -69,7 +69,7 @@ MIT License
 
 ## English
 
-Q-Agent is an intelligent Rust-based background service that connects to NapCatQQ to monitor QQ messages, uses a local LLM (Qwen3.5-9B) for analysis, and autonomously calls tools through an agent loop to handle tasks.
+QAgent is an intelligent Rust-based background service that connects to NapCatQQ to monitor QQ messages, uses a local LLM (Qwen3.5-9B) for analysis, and autonomously calls tools through an agent loop to handle tasks.
 
 ### Features
 
