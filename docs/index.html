@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QAgent · QQ 智慧助理</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: #1a1a28;
+  --border: #2a2a3e;
+  --accent: #7c7cff;
+  --accent2: #00cc88;
+  --accent3: #bc8cff;
+  --orange: #ff9900;
+  --text: #e8e8f0;
+  --text2: #8888aa;
+  --text3: #555570;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ====== Canvas BG ====== */
+#bg-canvas {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  z-index:0;
+  pointer-events:none;
+}
+
+/* ====== Nav ====== */
+nav {
+  position: fixed;
+  top:0; left:0; right:0;
+  z-index:100;
+  padding: 16px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10,10,15,0.7);
+  border-bottom: 1px solid var(--border);
+}
+nav .logo {
+  font-weight: 800;
+  font-size: 1.2em;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+nav .links { display:flex; gap:24px; }
+nav .links a {
+  color: var(--text2);
+  text-decoration: none;
+  font-size:0.88em;
+  font-weight:500;
+  transition: color 0.2s;
+}
+nav .links a:hover { color:var(--text); }
+nav .gh-link {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color:var(--text);
+  text-decoration:none;
+  font-size:0.85em;
+  transition: all 0.2s;
+}
+nav .gh-link:hover {
+  border-color: var(--accent);
+  background: rgba(124,124,255,0.1);
+}
+
+/* ====== Sections ====== */
+section {
+  position:relative;
+  z-index:1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 100px 40px;
+}
+.section-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: 2.2em;
+  font-weight: 800;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+.section-desc {
+  color: var(--text2);
+  font-size: 1.05em;
+  max-width: 600px;
+  margin-bottom: 50px;
+}
+
+/* ====== Hero ====== */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 120px 40px 80px;
+}
+.hero .logo-big {
+  font-size: 5em;
+  font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent3), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 16px;
+  line-height:1.1;
+}
+.hero .tagline {
+  font-size: 1.3em;
+  color: var(--text2);
+  max-width: 600px;
+  margin-bottom: 40px;
+  font-weight: 400;
+}
+.hero .tags {
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  justify-content:center;
+  margin-bottom: 50px;
+}
+.hero .tags span {
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-size:0.85em;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  background: var(--bg2);
+}
+.hero .cta {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding: 14px 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), #5a5acc);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1em;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.hero .cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(124,124,255,0.3);
+}
+.hero .scroll-hint {
+  position:absolute;
+  bottom:30px;
+  color: var(--text3);
+  font-size:0.8em;
+  animation: bounce 2s infinite;
+}
+@keyframes bounce {
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(8px)}
+}
+
+/* ====== Architecture ====== */
+.arch-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 40px;
+}
+.arch-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+  transition: border-color 0.3s, transform 0.2s;
+}
+.arch-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+}
+.arch-card .icon { font-size:2em; margin-bottom:12px; }
+.arch-card h4 { font-size:1.1em; font-weight:700; margin-bottom:8px; }
+.arch-card p { font-size:0.9em; color:var(--text2); line-height:1.6; }
+.arch-card ul { list-style:none; margin-top:12px; }
+.arch-card ul li {
+  font-size:0.83em;
+  color:var(--text2);
+  padding:3px 0;
+}
+.arch-card ul li::before { content:"▸ "; color:var(--text3); }
+.arch-flow {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  margin: 24px 0;
+  padding: 16px;
+  background: var(--bg3);
+  border-radius: 10px;
+  border:1px solid var(--border);
+  font-size:0.85em;
+  color:var(--text2);
+}
+.arch-flow span { color:var(--accent); font-weight:600; }
+
+/* ====== Features ====== */
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 40px;
+}
+.feature-card {
+  display:flex;
+  gap:18px;
+  padding:24px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  transition: border-color 0.3s;
+}
+.feature-card:hover { border-color:var(--accent); }
+.feature-card .icon { font-size:1.8em; flex-shrink:0; }
+.feature-card h4 { font-size:1em; font-weight:700; margin-bottom:4px; }
+.feature-card p { font-size:0.85em; color:var(--text2); line-height:1.6; }
+
+/* ====== Tools ====== */
+.tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  margin-top: 40px;
+}
+.tool-item {
+  background: var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:20px;
+  text-align:center;
+  transition: all 0.2s;
+}
+.tool-item:hover {
+  border-color:var(--accent);
+  transform:translateY(-2px);
+}
+.tool-item .icon { font-size:2em; margin-bottom:8px; }
+.tool-item .name { font-weight:600; font-size:0.9em; }
+.tool-item .desc { font-size:0.78em; color:var(--text2); margin-top:4px; }
+
+/* ====== Numbers ====== */
+.numbers {
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:20px;
+  margin-top:40px;
+  text-align:center;
+}
+.num-item { padding:30px; background:var(--bg2); border-radius:14px; border:1px solid var(--border); }
+.num-item .val { font-size:2.8em; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.num-item .label { font-size:0.85em; color:var(--text2); margin-top:4px; }
+
+/* ====== Stack ====== */
+.stack-grid {
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:12px;
+  margin-top:40px;
+}
+.stack-item {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px 20px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:0.9em;
+}
+.stack-item .tag {
+  padding:2px 10px;
+  border-radius:6px;
+  font-size:0.7em;
+  font-weight:600;
+  text-transform:uppercase;
+}
+.tag-rust { background:rgba(255,75,0,0.15); color:#ff4b00; }
+.tag-py { background:rgba(55,118,171,0.15); color:#3776ab; }
+.tag-web { background:rgba(124,124,255,0.15); color:var(--accent); }
+.tag-db { background:rgba(0,204,136,0.15); color:var(--accent2); }
+.tag-llm { background:rgba(188,140,255,0.15); color:var(--accent3); }
+.tag-win { background:rgba(255,153,0,0.15); color:var(--orange); }
+
+/* ====== Footer ====== */
+footer {
+  position:relative;
+  z-index:1;
+  text-align:center;
+  padding: 50px 40px;
+  border-top:1px solid var(--border);
+  color: var(--text3);
+  font-size:0.85em;
+}
+footer a { color:var(--text2); text-decoration:none; }
+footer a:hover { color:var(--text); }
+
+/* ====== Responsive ====== */
+@media (max-width:900px) {
+  .arch-grid { grid-template-columns:1fr; }
+  .features-grid { grid-template-columns:1fr; }
+  .tools-grid { grid-template-columns:1fr 1fr 1fr; }
+  .numbers { grid-template-columns:1fr 1fr; }
+  .stack-grid { grid-template-columns:1fr 1fr; }
+  .hero .logo-big { font-size:3em; }
+}
+@media (max-width:600px) {
+  .tools-grid { grid-template-columns:1fr 1fr; }
+  .stack-grid { grid-template-columns:1fr; }
+  nav .links { display:none; }
+  .hero .logo-big { font-size:2.2em; }
+  section { padding:60px 20px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<!-- Nav -->
+<nav>
+  <div class="logo">QAGENT</div>
+  <div class="links">
+    <a href="#arch">架构</a>
+    <a href="#features">特性</a>
+    <a href="#tools">工具</a>
+    <a href="#stack">技术栈</a>
+  </div>
+  <a class="gh-link" href="https://github.com/OrinVoss/Q-agent" target="_blank">GitHub ↗</a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="logo-big">QAGENT</div>
+  <div class="tagline">将 QQ 变为 AI 控制中心 · 本地智能 · 全自动处理</div>
+  <div class="tags">
+    <span>Rust</span>
+    <span>Qwen3.5-9B</span>
+    <span>本地 LLM</span>
+    <span>Agent 循环</span>
+    <span>10 工具</span>
+    <span>SQLite</span>
+    <span>NapCatQQ</span>
+    <span>Claude Code</span>
+  </div>
+  <a class="cta" href="https://github.com/OrinVoss/Q-agent" target="_blank">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub
+  </a>
+  <div class="scroll-hint">向下滚动</div>
+</section>
+
+<!-- Architecture -->
+<section id="arch">
+  <div class="section-label">架构</div>
+  <h2 class="section-title">三層智能流水线</h2>
+  <p class="section-desc">消息进入后经过感知、决策、行动三层处理，LLM 在核心循环中自主判断和调度。</p>
+
+  <div class="arch-flow">
+    <span>QQ 消息</span> → 感知层 → <span>Agent 循环</span> → 行动层 → <span>通知 / 存储</span>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-card">
+      <div class="icon">👀</div>
+      <h4>感知层</h4>
+      <p>通过 NapCatQQ WebSocket 实时监听消息，解析文本、图片、文件、@提及等。</p>
+      <ul>
+        <li>WebSocket :4447 + HTTP :4444</li>
+        <li>OneBot v11 协议解析</li>
+        <li>@我 / @别人 / @all 三级区分</li>
+        <li>排除列表跳过无关群/用户</li>
+      </ul>
+    </div>
+    <div class="arch-card" style="border-color:var(--accent)">
+      <div class="icon">🧠</div>
+      <h4>Agent 决策循环</h4>
+      <p>本地 LLM 分析消息，自主决定调用哪个工具，支持多步推理。</p>
+      <ul>
+        <li>Qwen3.5-9B 本地推理（42-48 t/s）</li>
+        <li>最多 10 轮迭代</li>
+        <li>ToolRegistry 10 个工具</li>
+        <li>三层记忆：上下文 + SQLite + 工具</li>
+        <li>语义搜索（embedding 余弦相似度）</li>
+      </ul>
+    </div>
+    <div class="arch-card">
+      <div class="icon">⚡</div>
+      <h4>行动层</h4>
+      <p>工具执行结果反馈给 LLM，形成闭环。支持 Windows 通知和外部 CLI 调用。</p>
+      <ul>
+        <li>Windows Toast 通知</li>
+        <li>Claude Code 子进程（stream-json）</li>
+        <li>SQLite WAL 持久化</li>
+        <li>Web 面板实时展示</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="section-label">特性</div>
+  <h2 class="section-title">为什么是 QAgent？</h2>
+  <p class="section-desc">不只是一个 QQ 机器人，而是一个真正有理解能力的个人助理。</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="icon">🔒</div>
+      <div>
+        <h4>纯本地 · 隐私优先</h4>
+        <p>LLM 在你的显卡上运行，数据不出本地。敏感信息不会上传到任何云端。</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔄</div>
+      <div>
+        <h4>Agent 自主循环</h4>
+        <p>收到消息 → LLM 判断 → 调工具 → 看结果 → 继续或完成。不需要预设规则。</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🧩</div>
+      <div>
+        <h4>10 个内置工具</h4>
+        <p>通知、日程、笔记、记忆、OCR、Claude Code、QQ 读取等，覆盖日常需求。</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="icon">💾</div>
+      <div>
+        <h4>三层记忆系统</h4>
+        <p>对话上下文 + SQLite 持久化 + 语义向量搜索，记得住且找得准。</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🤖</div>
+      <div>
+        <h4>Claude Code 集成</h4>
+        <p>复杂任务（写文档、编程、分析）自动委托给 Claude Code，实时反馈进度。</p>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📊</div>
+      <div>
+        <h4>Web 监控面板</h4>
+        <p>Axum + SSE 实时展示消息历史、日程、笔记、记忆和工作区文件。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Numbers -->
+<section>
+  <div class="numbers">
+    <div class="num-item"><div class="val">81</div><div class="label">Commits</div></div>
+    <div class="num-item"><div class="val">10</div><div class="label">工具</div></div>
+    <div class="num-item"><div class="val">42</div><div class="label">token/s</div></div>
+    <div class="num-item"><div class="val">8K</div><div class="label">上下文</div></div>
+  </div>
+</section>
+
+<!-- Tools -->
+<section id="tools">
+  <div class="section-label">工具</div>
+  <h2 class="section-title">10 个工具 · 按需调用</h2>
+  <p class="section-desc">LLM 根据消息内容自主选择工具组合，完成复杂任务。</p>
+
+  <div class="tools-grid">
+    <div class="tool-item"><div class="icon">🔔</div><div class="name">notify_user</div><div class="desc">Windows 通知</div></div>
+    <div class="tool-item"><div class="icon">📅</div><div class="name">schedule_create</div><div class="desc">创建日程</div></div>
+    <div class="tool-item"><div class="icon">📋</div><div class="name">schedule_list</div><div class="desc">查看日程</div></div>
+    <div class="tool-item"><div class="icon">✏️</div><div class="name">schedule_update</div><div class="desc">更新日程</div></div>
+    <div class="tool-item"><div class="icon">🤖</div><div class="name">claude_code</div><div class="desc">复杂任务执行</div></div>
+    <div class="tool-item"><div class="icon">👁️</div><div class="name">ocr_image</div><div class="desc">图片文字识别</div></div>
+    <div class="tool-item"><div class="icon">📝</div><div class="name">note_take</div><div class="desc">记录笔记</div></div>
+    <div class="tool-item"><div class="icon">💡</div><div class="name">remember</div><div class="desc">记忆写入</div></div>
+    <div class="tool-item"><div class="icon">🔍</div><div class="name">recall</div><div class="desc">记忆检索</div></div>
+    <div class="tool-item"><div class="icon">📖</div><div class="name">qq_read</div><div class="desc">QQ 信息读取</div></div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section id="stack">
+  <div class="section-label">技术栈</div>
+  <h2 class="section-title">Rust 核心 · 全栈本地</h2>
+  <p class="section-desc">从 LLM 推理到 Web 面板，全部本地运行，不依赖任何外部服务。</p>
+
+  <div class="stack-grid">
+    <div class="stack-item"><span class="tag tag-rust">Rust</span>tokio + axum 异步框架</div>
+    <div class="stack-item"><span class="tag tag-rust">Rust</span>rusqlite (SQLite WAL)</div>
+    <div class="stack-item"><span class="tag tag-llm">LLM</span>Qwen3.5-9B (llama.cpp)</div>
+    <div class="stack-item"><span class="tag tag-llm">Embed</span>Qwen3.5-0.8B (CPU)</div>
+    <div class="stack-item"><span class="tag tag-web">Web</span>Axum + SSE + SPA</div>
+    <div class="stack-item"><span class="tag tag-py">Python</span>Tesseract OCR</div>
+    <div class="stack-item"><span class="tag tag-db">DB</span>SQLite WAL + parking_lot</div>
+    <div class="stack-item"><span class="tag tag-llm">Agent</span>Claude Code CLI</div>
+    <div class="stack-item"><span class="tag tag-win">Win</span>Windows Toast 通知</div>
+  </div>
+</section>
+
+<!-- GitHub CTA -->
+<section style="text-align:center; padding-bottom:60px;">
+  <p style="color:var(--text2);margin-bottom:20px;font-size:1.05em;">开源 · MIT License · 欢迎参与</p>
+  <a class="cta" href="https://github.com/OrinVoss/Q-agent" target="_blank">
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    Star on GitHub
+  </a>
+</section>
+
+<footer>
+  <p>QAgent · QQ 智慧助理 · <a href="https://github.com/OrinVoss/Q-agent" target="_blank">Orin Voss</a></p>
+  <p style="margin-top:4px;font-size:0.85em;">MIT License · Built with Rust 🦀</p>
+</footer>
+
+<script>
+// === Animated background ===
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let w, h, particles = [];
+
+function resize() {
+  w = canvas.width = window.innerWidth;
+  h = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Particle {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = Math.random() * w;
+    this.y = Math.random() * h;
+    this.vx = (Math.random() - 0.5) * 0.3;
+    this.vy = (Math.random() - 0.5) * 0.3;
+    this.r = Math.random() * 1.5 + 0.5;
+  }
+  update() {
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(124,124,255,0.15)';
+    ctx.fill();
+  }
+}
+
+for (let i = 0; i < 80; i++) particles.push(new Particle());
+
+function animate() {
+  ctx.clearRect(0, 0, w, h);
+  particles.forEach(p => { p.update(); p.draw(); });
+  // Draw connections
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 120) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.strokeStyle = `rgba(124,124,255,${0.04 * (1 - dist / 120)})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+
+// === Intersection Observer for cards ===
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.arch-card, .feature-card, .tool-item, .num-item, .stack-item').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(20px)';
+  el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+  observer.observe(el);
+});
+</script>
+</body>
+</html>
