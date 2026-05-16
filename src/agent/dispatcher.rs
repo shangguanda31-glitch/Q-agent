@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tracing::warn;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ParsedToolCall {
@@ -20,19 +21,27 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
     let mut calls = Vec::new();
     let mut cleaned = String::new();
     let mut remaining = text.as_str();
+    let mut parse_errors = 0u32;
 
     while let Some(start) = remaining.find("<tool_call>") {
-        // Everything before this tag is plain text
         cleaned.push_str(&remaining[..start]);
-        remaining = &remaining[start + 11..]; // skip <tool_call>
+        remaining = &remaining[start + 11..];
 
         if let Some(end) = remaining.find("</tool_call>") {
             let json_str = remaining[..end].trim();
-            if let Ok(call) = serde_json::from_str::<ParsedToolCall>(json_str) {
-                calls.push(call);
+            match serde_json::from_str::<ParsedToolCall>(json_str) {
+                Ok(call) => calls.push(call),
+                Err(e) => {
+                    parse_errors += 1;
+                    if parse_errors <= 3 {
+                        warn!("Failed to parse tool_call JSON (attempt {}): {} | content: {}",
+                              parse_errors, e, json_str.chars().take(80).collect::<String>());
+                    }
+                }
             }
-            remaining = &remaining[end + 12..]; // skip </tool_call>
+            remaining = &remaining[end + 12..];
         } else {
+            warn!("Unclosed <tool_call> tag (no </tool_call> found)");
             break;
         }
     }

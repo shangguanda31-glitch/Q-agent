@@ -62,10 +62,9 @@ impl Tool for OcrTool {
         let exe = match Self::find_tesseract() {
             Some(p) => p,
             None => return ToolResult::fail(
-                "Tesseract OCR 未安装。请手动安装：\n\
-                 1. 下载 https://github.com/UB-Mannheim/tesseract/releases/latest\n\
-                 2. 安装时勾选中文语言包\n\
-                 或直接运行: D:\\桌面\\编程作品\\Sandy ONE\\qq-assistant\\tesseract\\tesseract_setup.exe"
+                "Tesseract OCR 未安装。\n\
+                 设置 TESSERACT_PATH 环境变量指向 tesseract.exe，或将其加入 PATH。\n\
+                 下载: https://github.com/UB-Mannheim/tesseract/releases/latest"
             ),
         };
 
