@@ -159,7 +159,9 @@ MIT License
 <a href="https://github.com/OrinVoss/Q-agent/issues">GitHub Issues</a> ·
 <a href="docs/project/polish-plan.md">完善计划</a> ·
 <a href="docs/project/vision.md">远景规划</a> ·
-<a href="docs/technical/dependencies.md">依赖详情</a>
+<a href="docs/technical/dependencies.md">依赖详情</a> ·
+<a href="docs/technical/developer.md">开发者文档</a> ·
+<a href="docs/technical/api-reference.md">API 参考</a>
 </div>
 
 </div>
@@ -300,7 +302,9 @@ MIT License
 <a href="https://github.com/OrinVoss/Q-agent/issues">GitHub Issues</a> ·
 <a href="docs/project/polish-plan.md">Polish Plan</a> ·
 <a href="docs/project/vision.md">Vision</a> ·
-<a href="docs/technical/dependencies.md">Dependencies</a>
+<a href="docs/technical/dependencies.md">Dependencies</a> ·
+<a href="docs/technical/developer.md">Developer Guide</a> ·
+<a href="docs/technical/api-reference.md">API Reference</a>
 </div>
 
 </div>
