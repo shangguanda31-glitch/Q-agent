@@ -24,9 +24,6 @@ impl OcrTool {
             format!("{}/tesseract/tesseract.exe", project_root),
             format!("{}/tesseract/bin/tesseract.exe", project_root),
             "tesseract/tesseract.exe".to_string(),
-            "tesseract/bin/tesseract.exe".to_string(),
-            "C:/Program Files/Tesseract-OCR/tesseract.exe".to_string(),
-            "C:/Program Files (x86)/Tesseract-OCR/tesseract.exe".to_string(),
         ];
         for path in &candidates {
             if std::path::Path::new(path).exists() { return Some(path.to_string()); }
