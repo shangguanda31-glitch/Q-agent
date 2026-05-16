@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tracing::warn;
 
@@ -47,43 +48,79 @@ impl Tool for ClaudeCodeTool {
 
         let safe_prompt = prompt.replace('"', "\\\"");
 
-        // Wrap prompt to ensure Claude Code creates actual files, not just text output
         let wrapped = format!(
             "请完成以下任务，并在工作目录中创建实际的成果文件（如.docx、.pptx、.md、.html等）。\n\
              注意：必须输出完整内容，不要只写大纲。\n\n{}",
             safe_prompt
         );
-        let Ok(child) = Command::new("claude")
+
+        let mut child = match Command::new("claude")
             .args(["-p", &wrapped, "--dangerously-skip-permissions", "--print", "--effort", "max"])
             .current_dir(&self.working_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
-        else {
-            return ToolResult::fail(
+        {
+            Ok(c) => c,
+            Err(_) => return ToolResult::fail(
                 "无法启动 Claude Code CLI。请确保已安装 `claude` 命令（npm install -g @anthropic-ai/claude-code）"
-            );
+            ),
         };
 
-        let result = match tokio::time::timeout(
-            std::time::Duration::from_secs(self.timeout_secs),
-            child.wait_with_output(),
-        ).await {
-            Ok(Ok(output)) => output,
-            Ok(Err(e)) => return ToolResult::fail(format!("Claude Code 执行错误: {}", e)),
-            Err(_) => return ToolResult::fail(format!("Claude Code 执行超时 ({}s)", self.timeout_secs)),
-        };
+        let mut child_stdout = child.stdout.take().expect("stdout piped");
+        let child_stderr = child.stderr.take().expect("stderr piped");
 
-        let mut stdout = String::from_utf8_lossy(&result.stdout).to_string();
-        let _stderr = String::from_utf8_lossy(&result.stderr);
+        // Write progress to a file that the web panel can read
+        let progress_file = format!("{}/.claude_progress", self.working_dir);
+        let _ = tokio::fs::write(&progress_file, "启动 Claude Code...").await;
+
+        // Background task: read stderr line by line for progress
+        let pf = progress_file.clone();
+        let stderr_task = tokio::spawn(async move {
+            let reader = BufReader::new(child_stderr);
+            let mut lines = reader.lines();
+            let mut last_notify = std::time::Instant::now();
+
+            while let Ok(Some(line)) = lines.next_line().await {
+                let clean = line.trim().to_string();
+                if !clean.is_empty() && !clean.contains('\x1b') {
+                    let _ = tokio::fs::write(&pf, &clean).await;
+                    if last_notify.elapsed() >= std::time::Duration::from_secs(20) {
+                        let preview: String = clean.chars().take(50).collect();
+                        crate::notify::send_toast("Claude Code 处理中", &preview);
+                        last_notify = std::time::Instant::now();
+                    }
+                }
+            }
+        });
+
+        // Read stdout for the final response
+        let timeout_duration = std::time::Duration::from_secs(self.timeout_secs);
+        let mut output_buf = Vec::new();
+        let read_result = tokio::time::timeout(timeout_duration, child_stdout.read_to_end(&mut output_buf)).await;
+
+        // Wait for process exit
+        let status = child.wait().await.ok();
+
+        // Clean up progress file
+        stderr_task.abort();
+        let _ = tokio::fs::write(&progress_file, "").await;
+
+        let mut stdout = String::from_utf8_lossy(&output_buf).to_string();
 
         if stdout.len() > self.max_output_bytes {
             stdout.truncate(self.max_output_bytes);
             stdout.push_str("\n...(输出已截断)");
         }
 
-        if result.status.success() {
-            // Include file listing in workspace
+        // Handle timeout vs completion
+        if read_result.is_err() {
+            return ToolResult::fail(format!("Claude Code 执行超时 ({}s)\n部分输出:\n{}", self.timeout_secs, stdout));
+        }
+
+        let success = status.map(|s| s.success()).unwrap_or(false);
+
+        if success {
             let workspace = &self.working_dir;
             let file_list = match std::fs::read_dir(workspace) {
                 Ok(entries) => {
@@ -96,8 +133,8 @@ impl Tool for ClaudeCodeTool {
             };
             ToolResult::ok(format!("{}{}", stdout, file_list))
         } else {
-            warn!("Claude Code returned non-zero exit: {}", result.status);
-            ToolResult::fail(format!("Claude Code 返回错误 ({}):\n{}", result.status, stdout))
+            warn!("Claude Code returned non-zero exit");
+            ToolResult::fail(format!("Claude Code 返回错误:\n{}", stdout))
         }
     }
 }
