@@ -11,7 +11,7 @@ QQ 智慧助理是一个 Rust 编写的后台服务，通过 NapCatQQ WebSocket 
 │                       qq-assistant                          │
 │                                                             │
 │  ┌──────────┐   ┌──────────────┐   ┌─────────────────────┐ │
-│  │ NapCatQQ │──▶│  Agent Loop  │──▶│   9 Tools           │ │
+│  │ NapCatQQ │──▶│  Agent Loop  │──▶│   10 Tools           │ │
 │  │ WebSocket│   │              │   │   notify_user       │ │
 │  │ :4447    │   │ LLM 自行判断  │   │   schedule_create   │ │
 │  └──────────┘   │ 调哪个工具    │   │   claude_code       │ │

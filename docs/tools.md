@@ -15,7 +15,7 @@ pub trait Tool: Send + Sync {
 
 ## 工具清单
 
-当前注册 9 个工具：
+当前注册 10 个工具：
 
 ### notify_user
 - **功能**: Windows 桌面通知弹窗
@@ -29,6 +29,10 @@ pub trait Tool: Send + Sync {
 - **时间解析**: 自动解析中文时间表达式（"明天下午5点"）
 
 ### schedule_list
+n### schedule_update
+- **功能**: 更新已有日程的信息（地点等补充）
+- **参数**: `{title, time?, info}`
+- **用途**: 收到后续补充消息时追加到原有日程
 - **功能**: 查看所有日程列表
 - **参数**: 无
 
