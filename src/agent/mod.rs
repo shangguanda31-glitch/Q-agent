@@ -199,7 +199,7 @@ async fn handle_message(
     let system_prompt = crate::agent::prompt::build_system_prompt(&tools, &memory_context);
 
     let mut messages: Vec<AgentMessage> = Vec::new();
-    let recent_history = chat_history.recent(&chat_id, 10);
+    let recent_history = chat_history.recent(&chat_id, 20);
     for h in recent_history.iter().rev() {
         messages.push(AgentMessage { role: h.role.clone(), content: h.content.clone() });
     }
@@ -209,7 +209,7 @@ async fn handle_message(
 
     for iteration in 0..max_iterations {
         // Chinese text ~1.5-2 tokens/char, so byte_len*2/5 is closer than byte_len/4
-        const MAX_TOKENS: usize = 8192;
+        const MAX_TOKENS: usize = 6144;
         let est_tokens: usize = system_prompt.len() * 2 / 5 + messages.iter().map(|m| m.content.len() * 2 / 5 + 10).sum::<usize>();
         if est_tokens > MAX_TOKENS && messages.len() > 6 {
             let split = messages.len().saturating_sub(4);
