@@ -24,9 +24,9 @@ pub trait Tool: Send + Sync {
 
 ### schedule_create
 - **功能**: 保存一条日程
-- **参数**: `{title, info}`（info 为自然语言描述的时间/地点等）
+- **参数**: `{title, time?, info?}`
+- **时间解析**: 自动解析中文时间表达式（"下周三下午5点""后天晚上8点半""5月20号"）
 - **存储**: data.db (schedules 表)
-- **时间解析**: 自动解析中文时间表达式（"明天下午5点"）
 
 ### schedule_update
 - **功能**: 更新已有日程的信息（地点等补充）
@@ -41,8 +41,10 @@ pub trait Tool: Send + Sync {
 ### claude_code
 - **功能**: 调用 Claude Code CLI 处理复杂任务
 - **参数**: `{prompt}`
-- **特性**: max-iter 50, 固定工作目录 claude_workspace/, 跳过权限
-- **通知**: 完成时推送 Windows 通知，包含创建的文件列表
+- **特性**: effort max, stream-json 实时进度, 工作目录 claude_workspace/, 跳过权限
+- **进度**: 每 10s 推送 thinking 内容通知，检测到工具调用时额外通知
+- **超时**: 1800s，最多 2 个并发
+- **API**: 讯飞星火 astron-code-latest
 
 ### ocr_image
 - **功能**: Tesseract OCR 图片文字识别
@@ -58,8 +60,8 @@ pub trait Tool: Send + Sync {
 ### remember
 - **功能**: 语义记忆写入
 - **参数**: `{content}`
-- **存储**: data.db (memories 表)，含 4096 维 embedding
-- **语义搜索**: 调用 llama-server `/v1/embeddings` 生成向量
+- **存储**: data.db (memories 表)，含 1024 维 embedding
+- **语义搜索**: 调用 embed 服务器 `/v1/embeddings` 生成向量
 
 ### recall
 - **功能**: 语义记忆读取

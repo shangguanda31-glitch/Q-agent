@@ -29,11 +29,14 @@ cargo run --release
 
 ### 环境变量
 
+完整 18 个变量见项目 README。核心必须设置的：
+
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `NAPCAT_WS_URL` | `ws://127.0.0.1:4447` | NapCatQQ WebSocket |
-| `NAPCAT_TOKEN` | — | 鉴权 Token（必须）|
+| `NAPCAT_TOKEN` | `your_token_here` | 鉴权 Token（必须设置实际值）|
 | `WEB_PORT` | `5050` | 面板端口 |
+| `LLAMA_MODEL_PATH` | `models/qwen3.5-9b-q4_k_m.gguf` | LLM 模型路径 |
 
 ### LLM 配置
 
