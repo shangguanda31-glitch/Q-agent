@@ -139,17 +139,42 @@ async fn handle_message(
     let mut final_response = String::new();
 
     for iteration in 0..max_iterations {
-        // Context window management: estimate tokens and trim if needed
-        const MAX_TOKENS: usize = 6144; // leave 2048 for response generation
-        loop {
-            let est_tokens: usize = system_prompt.len() / 4 + messages.iter().map(|m| m.content.len() / 4 + 10).sum::<usize>();
-            if est_tokens < MAX_TOKENS || messages.len() <= 2 {
-                break;
+        // Context window management: summarize old messages instead of trimming
+        const MAX_TOKENS: usize = 6144;
+        let est_tokens: usize = system_prompt.len() / 4 + messages.iter().map(|m| m.content.len() / 4 + 10).sum::<usize>();
+
+        if est_tokens > MAX_TOKENS && messages.len() > 6 {
+            // Keep: summary + system_prompt_equivalent + latest 4 messages
+            let split = messages.len().saturating_sub(4);
+            let old_msgs = messages.drain(..split).collect::<Vec<_>>();
+
+            // Summarize old messages using LLM
+            let old_text: String = old_msgs.iter()
+                .map(|m| format!("[{}]: {}", m.role, m.content.chars().take(200).collect::<String>()))
+                .collect::<Vec<_>>().join("\n").chars().take(3000).collect();
+
+            let summary_prompt = format!(
+                "以下是QQ群聊/私聊的对话历史，请用中文总结关键信息（讨论了什么、谁说了什么重要内容、做出了什么决定）。\
+                 保持客观，不要遗漏重要事实。\n\n对话历史：\n{}", old_text);
+
+            match llm.agent_chat(&[], "你是一个对话摘要助手。用简洁的语言总结对话要点，不超过200字。", None).await {
+                Ok(summary_text) => {
+                    // Try to get a summary from LLM
+                    let summary_body = format!("[对话摘要]\n{}", summary_text);
+                    messages.insert(0, AgentMessage { role: "user".to_string(), content: summary_body });
+                    info!("Context summary created (replaced {} messages)", split);
+                }
+                Err(_) => {
+                    // Fallback: simple keyword extraction as summary
+                    let keywords: String = old_msgs.iter()
+                        .flat_map(|m| m.content.split_whitespace())
+                        .filter(|w| w.len() > 2)
+                        .collect::<Vec<_>>().join(" ");
+                    let simple_summary = format!("[历史摘要] 之前聊到了：{}", &keywords.chars().take(200).collect::<String>());
+                    messages.insert(0, AgentMessage { role: "user".to_string(), content: simple_summary });
+                    info!("Context fallback summary (LLM failed, used keyword extract)");
+                }
             }
-            // Remove the second-oldest user message (keep first and latest)
-            let remove_idx = if messages.len() > 3 { 1 } else { break };
-            let removed = messages.remove(remove_idx);
-            info!("Context trim: removed {} chars (~{} tokens)", removed.content.len(), removed.content.len() / 4);
         }
 
         // Download images: for vision LLM and OCR
