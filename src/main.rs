@@ -122,34 +122,23 @@ async fn main() -> anyhow::Result<()> {
 
             let cfg = config::Config::from_env();
 
-                    fn pad(s: &str, w: usize) -> String {
-        let cjk = s.chars().filter(|&c| c as u32 > 0x2E80).count();
-        let visible = s.chars().count() + cjk;
-        if visible >= w { return s.to_string(); }
-        s.to_string() + &" ".repeat(w - visible)
-    }
+                                    let ver = env!("CARGO_PKG_VERSION");
 
-    let data = cfg.data_dir.trim_start_matches("D:/桌面/编程作品/Sandy ONE/qq-assistant/");
-    let llm = format!("{} (9B, :8081)", cfg.llm_model);
-    let ver = env!("CARGO_PKG_VERSION");
-    let bar = "─".repeat(61);
-
-    println!("┌{}┐", bar);
-    println!("│{:^61}│", "");
-    println!("│   ██████  ███████   █████  ██████  ███████ ███    ██████   │");
-    println!("│  ██       ██       ██   ██ ██   ██ ██      ██    ██   ██  │");
-    println!("│  ██   ███ █████   ███████ ██████  █████   ██    ██████   │");
-    println!("│  ██    ██ ██       ██   ██ ██   ██ ██      ██    ██   ██  │");
-    println!("│   ██████  ███████  ██   ██ ██   ██ ███████ ███    ██████   │");
-    println!("│{:^61}│", format!("v{}", ver));
-    println!("│{:^61}│", "");
-    println!("├{}┤", bar);
-    println!("│  NapCat  {}│", pad(&cfg.napcat_ws_url, 49));
-    println!("│  LLM     {}│", pad(&llm, 49));
-    println!("│  Embed   {}│", pad("Qwen3.5-0.8B (:8082, CPU)", 49));
-    println!("│  Web     {}│", pad(&format!("http://127.0.0.1:{}", cfg.web_port), 49));
-    println!("│  Data    {}│", pad(&format!("./{}", data), 49));
-    println!("└{}┘", bar);
+    println!();
+    println!("  ┌───────────────────────────────────────────────────────────────┐");
+    println!("  │    QQQ    AAA   GGG   EEEEE  N   N  TTTTT    │");
+    println!("  │   Q   Q  A   A G   G  E      NN  N    T      │");
+    println!("  │   Q   Q  AAAAA G   G  EEEE   N N N    T      │");
+    println!("  │   Q  QQ  A   A G   G  E      N  NN    T      │");
+    println!("  │    QQQQ  A   A  GGG   EEEEE  N   N    T      │");
+    println!("  │                                            │");
+    println!("  │  QAgent v{}                                    │", ver);
+    println!("  │  NapCat  {}                    │", cfg.napcat_ws_url);
+    println!("  │  LLM     {} (9B)                │", cfg.llm_model);
+    println!("  │  Embed   Qwen3.5-0.8B (:8082, CPU)              │");
+    println!("  │  Web     http://127.0.0.1:{}                    │", cfg.web_port);
+    println!("  └───────────────────────────────────────────────────────────────┘");
+    println!();
 
     let (_llm_process, llm_url) = start_llama_server(&cfg);
     // Start embed server (0.8B model)
