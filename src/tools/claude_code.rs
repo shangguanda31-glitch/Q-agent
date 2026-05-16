@@ -84,16 +84,25 @@ impl Tool for ClaudeCodeTool {
             let reader = BufReader::new(child_stderr);
             let mut lines = reader.lines();
             let mut last_notify = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
             while let Ok(Some(line)) = lines.next_line().await {
-                let clean = line.trim().to_string();
-                if !clean.is_empty() && !clean.contains('\x1b') {
+                // Strip ANSI escape sequences
+                let clean = strip_ansi(&line);
+                let clean = clean.trim();
+                if !clean.is_empty() {
                     let _ = tokio::fs::write(&pf, &clean).await;
-                    if last_notify.elapsed() >= std::time::Duration::from_secs(20) {
-                        let preview: String = clean.chars().take(50).collect();
-                        crate::notify::send_toast("Claude Code 处理中", &preview);
+                    if last_notify.elapsed() >= std::time::Duration::from_secs(15) {
+                        let preview: String = clean.chars().take(60).collect();
+                        let elapsed = start.elapsed().as_secs();
+                        crate::notify::send_toast(&format!("Claude Code {}s", elapsed), &preview);
                         last_notify = std::time::Instant::now();
                     }
+                } else if last_notify.elapsed() >= std::time::Duration::from_secs(30) {
+                    // Heartbeat: no progress for 30s
+                    let elapsed = start.elapsed().as_secs();
+                    crate::notify::send_toast(&format!("Claude Code {}s", elapsed), "处理中，请稍候...");
+                    last_notify = std::time::Instant::now();
                 }
             }
         });
@@ -141,4 +150,21 @@ impl Tool for ClaudeCodeTool {
             ToolResult::fail(format!("Claude Code 返回错误:\n{}", stdout))
         }
     }
+}
+
+/// Remove ANSI escape sequences from a string
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            while let Some(n) = chars.next() {
+                if n == 'm' { break; }
+            }
+        } else if c == '\r' {
+        } else {
+            out.push(c);
+        }
+    }
+    out.trim().to_string()
 }
