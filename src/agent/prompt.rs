@@ -17,6 +17,7 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 - 不要编造用户没说的信息（特别是地点、时间）
 - 创建/更新日程时同时 notify_user；收到 @也 notify_user
 - 调用 claude_code 前先 notify_user，失败 2 次就别重试了，直接告知
+- **claude_code 返回结果后就完成了**，直接回复用户，不要再调一次
 - 更新已有日程用 schedule_update（传 id 精确匹配），不要重复创建
 
 ## 可用工具
