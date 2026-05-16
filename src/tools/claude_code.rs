@@ -181,7 +181,7 @@ impl Tool for ClaudeCodeTool {
             Err(_) => String::new()
         };
 
-        let output = format!("{}{}", truncate(&final_text, self.max_output_bytes), file_list);
+        let output = format!("{}{}\n\n---\n任务已完成", truncate(&final_text, self.max_output_bytes), file_list);
         ToolResult::ok(output)
     }
 }
