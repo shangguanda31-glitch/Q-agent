@@ -50,6 +50,9 @@
 | changelog/ | 修改记录（每次提交必填） |
 
 ### 安全规范
+n### 已知教训
+- **Tool参数不可硬编码为None**: 不要强行将工具参数设为None（如`let time = info.as_ref().and_then(|_| None)`），这会使LLM传入的数据丢失
+- **Cargo.toml的中文字符**: 部分环境可能引起解析错误，使用英文替代
 - ⚠️ **严禁** 将 Token、密码、密钥等敏感信息写入文档、README、changelog 或任何公开文件
 - 配置默认值应使用占位符（如 `your_token_here`），而非真实值
 - 敏感信息仅通过环境变量传入，不硬编码在源码中
