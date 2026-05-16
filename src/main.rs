@@ -120,33 +120,41 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|_| "qq_assistant=info".into()))
         .init();
 
-        let cfg = config::Config::from_env();
+            let cfg = config::Config::from_env();
 
-    println!(r#"
-╭─────────────────────────────────────────────────────────────╮
-│                                                             │
-│       ██████  ███████         █████  ██████  ███████ ███    │
-│      ██       ██             ██   ██ ██   ██ ██      ██    │
-│      ██   ███ █████   █████  ███████ ██████  █████   ██    │
-│      ██    ██ ██             ██   ██ ██   ██ ██      ██    │
-│       ██████  ███████        ██   ██ ██   ██ ███████ ███    │
-│                                                             │
-│                                      v{}
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  NapCat  {:40} │
-│  LLM     {:40} │
-│  Embed   {:40} │
-│  Web     {:40} │
-│  Data    {:40} │
-╰─────────────────────────────────────────────────────────────╯
+    fn pad(s: &str, w: usize) -> String {
+        let cjk = s.chars().filter(|&c| c as u32 > 0x2E80).count();
+        let visible = s.chars().count() + cjk;
+        let spaces = if visible >= w { 2 } else { w - visible };
+        format!("{}{}", s, " ".repeat(spaces))
+    }
+
+    let data = cfg.data_dir.trim_start_matches("D:/桌面/编程作品/Sandy ONE/qq-assistant/");
+    let llm = format!("{} (9B, :8081)", cfg.llm_model);
+
+    println!(r#"┌───────────────────────────────────────────────────────────┐
+|                                                             |
+|   ██████  ███████   █████  ██████  ███████ ███    ██████   |
+|  ██       ██       ██   ██ ██   ██ ██      ██    ██   ██  |
+|  ██   ███ █████   ███████ ██████  █████   ██    ██████   |
+|  ██    ██ ██       ██   ██ ██   ██ ██      ██    ██   ██  |
+|   ██████  ███████  ██   ██ ██   ██ ███████ ███    ██████   |
+|                                                       v{}  |
+|                                                             |
+├───────────────────────────────────────────────────────────┤
+|  NapCat  {}
+|  LLM     {}
+|  Embed   {}
+|  Web     {}
+|  Data    {}
+└───────────────────────────────────────────────────────────┘
 "#,
     env!("CARGO_PKG_VERSION"),
-    cfg.napcat_ws_url,
-    format!("{} (9B, :8081)", cfg.llm_model),
-    "Qwen3.5-0.8B (:8082, CPU)",
-    format!("http://127.0.0.1:{}", cfg.web_port),
-    cfg.data_dir,
+    pad(&cfg.napcat_ws_url, 55),
+    pad(&llm, 55),
+    pad("Qwen3.5-0.8B (:8082, CPU)", 55),
+    pad(&format!("http://127.0.0.1:{}", cfg.web_port), 55),
+    pad(&format!("./{}", data), 55),
     );
 
     let (_llm_process, llm_url) = start_llama_server(&cfg);
