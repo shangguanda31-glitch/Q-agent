@@ -19,7 +19,7 @@ pub async fn run(
     _napcat_api: Arc<NapCatApi>,
     processed_tx: broadcast::Sender<ProcessedEvent>,
     event_store: Arc<EventStore>,
-    schedule_store: Arc<ScheduleStore>,
+    _schedule_store: Arc<ScheduleStore>,
     tools: Arc<ToolRegistry>,
     max_iterations: usize,
     chat_history: Arc<crate::store::MessageHistoryStore>,
@@ -32,7 +32,7 @@ pub async fn run(
                 let api = _napcat_api.clone();
                 let pt = processed_tx.clone();
                 let es = event_store.clone();
-                let ss = schedule_store.clone();
+                let ss = _schedule_store.clone();
                 let tools = tools.clone();
                 let ch = chat_history.clone();
                 let ms = memory_store.clone();
@@ -54,7 +54,7 @@ async fn handle_message(
     napcat_api: Arc<NapCatApi>,
     processed_tx: broadcast::Sender<ProcessedEvent>,
     event_store: Arc<EventStore>,
-    schedule_store: Arc<ScheduleStore>,
+    _schedule_store: Arc<ScheduleStore>,
     tools: Arc<ToolRegistry>,
     max_iterations: usize,
     chat_history: Arc<crate::store::MessageHistoryStore>,
