@@ -141,7 +141,7 @@ const p=r.filter(s=>s.status!=='done'),d=r.filter(s=>s.status==='done');let h=''
 if(p.length)h+='<div style="padding:8px 12px;font-size:11px;color:var(--text3)">⏳ 待处理</div>'+p.map(s=>'<div class="schedule-item"><div style="font-size:16px">⏳</div><div style="flex:1"><div style="font-weight:600;font-size:13px">'+esc(s.title)+'</div><div style="font-size:11px;color:var(--text2)">'+esc(s.time||'时间待定')+'</div></div><button class="s-btn done" onclick="sched(\'done\',\''+s.id+'\')">✅</button><button class="s-btn del" onclick="sched(\'del\',\''+s.id+'\')">✕</button></div>').join('')
 if(d.length)h+='<div style="padding:8px 12px;font-size:11px;color:var(--text3);margin-top:8px">✅ 已完成</div>'+d.map(s=>'<div class="schedule-item"><div style="font-size:16px">✅</div><div style="flex:1"><div style="font-weight:600;font-size:13px">'+esc(s.title)+'</div><div style="font-size:11px;color:var(--text2)">'+esc(s.time||'')+'</div></div><button class="s-btn del" onclick="sched(\'del\',\''+s.id+'\')">✕</button></div>').join('')
 listContent.innerHTML=h}
-async function sched(a,i){await fetch('/api/schedules/'+a,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:i})});renderSchedules();updateStats()}
+async function sched(a,i){await fetch('/api/schedules/'+(a==="del"?"delete":a),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:i})});renderSchedules();updateStats()}
 
 async function renderNotes(){let r=[];try{r=await(await fetch('/api/notes')).json()}catch(e){}
 if(!r.length){listContent.innerHTML='<div class="empty-state">📝 暂无笔记</div>';return}

@@ -32,7 +32,7 @@ impl Ord for QueuedMsg {
         let m = self.is_mentioned.cmp(&other.is_mentioned);
         if m != Ordering::Equal { return m; }
         // 2. Shorter messages first (faster to process)
-        other.text_len.cmp(&self.text_len)
+        self.text_len.cmp(&other.text_len)
     }
 }
 impl PartialOrd for QueuedMsg { fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) } }
