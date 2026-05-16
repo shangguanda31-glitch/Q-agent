@@ -348,11 +348,97 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 fn try_parse_time(s: &str) -> Option<String> {
+    use chrono::Datelike;
     let now = chrono::Local::now();
-    let today = now.format("%Y-%m-%d").to_string();
-    let tomorrow = (now + chrono::Duration::days(1)).format("%Y-%m-%d").to_string();
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s.trim(), "%Y-%m-%d %H:%M") { return Some(dt.format("%Y-%m-%d %H:%M").to_string()); }
-    let hour = s.find('点').and_then(|pos| s[..pos].chars().rev().take(2).collect::<String>().chars().rev().collect::<String>().trim().parse::<u32>().ok());
-    if let Some(mut h) = hour { if s.contains("下午")||s.contains("晚上") { if h < 12 { h += 12; } } return Some(format!("{} {:02}:00", if s.contains("明天"){&tomorrow}else{&today}, h)); }
+    let s = s.trim();
+
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M") {
+        return Some(dt.format("%Y-%m-%d %H:%M").to_string());
+    }
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Some(format!("{} 00:00", d));
+    }
+
+    let day_lower = s.to_lowercase();
+
+    // Base date: handle relative days
+    let mut base_date = now.date_naive();
+    if day_lower.contains("大后天") { base_date += chrono::Duration::days(3); }
+    if day_lower.contains("后天") { base_date += chrono::Duration::days(2); }
+    if day_lower.contains("明天") || day_lower.contains("明日") { base_date += chrono::Duration::days(1); }
+
+    // Weekday references: 下周三 / 本周五 / 这周二
+    let weekdays = [("一",0),("二",1),("三",2),("四",3),("五",4),("六",5),("日",6),("天",6)];
+    for &(name, target) in &weekdays {
+        let current = base_date.weekday().num_days_from_monday();
+        if day_lower.contains(&format!("下{}", name)) {
+            let ahead = if target > current { target - current + 7 } else { target - current + 14 };
+            base_date += chrono::Duration::days(ahead as i64);
+            break;
+        }
+        if day_lower.contains(&format!("本{}", name)) || day_lower.contains(&format!("这{}", name)) {
+            let ahead = if target >= current { target - current } else { target - current + 7 };
+            if ahead > 0 { base_date += chrono::Duration::days(ahead as i64); }
+            break;
+        }
+    }
+
+    // Month-day: X月X号 / X月X日
+    if let Some((m, d)) = parse_month_day(s) {
+        let y = base_date.year();
+        if let Ok(date) = chrono::NaiveDate::parse_from_str(&format!("{}-{:02}-{:02}", y, m, d), "%Y-%m-%d") {
+            if date < base_date {
+                base_date = chrono::NaiveDate::parse_from_str(&format!("{}-{:02}-{:02}", y + 1, m, d), "%Y-%m-%d").unwrap();
+            } else {
+                base_date = date;
+            }
+        }
+    }
+
+    // Time parsing
+    let is_pm = day_lower.contains("下午") || day_lower.contains("晚上") || day_lower.contains("傍晚");
+    let is_am = day_lower.contains("上午") || day_lower.contains("早上") || day_lower.contains("凌晨");
+    let is_noon = day_lower.contains("中午");
+
+    let mut hour = None;
+    let mut minute = None;
+
+    if let Some(pos) = s.find('点') {
+        let before: String = s[..pos].chars().filter(|c| c.is_ascii_digit()).collect();
+        hour = before.parse::<u32>().ok();
+
+        let after = &s[pos + 3..]; // skip '点' (UTF-8)
+        if after.starts_with("半") { minute = Some(30); }
+        else if after.starts_with("一刻") || after.starts_with('刻') { minute = Some(15); }
+        else if after.starts_with("三刻") { minute = Some(45); }
+        else {
+            // "X分" or plain number
+            let digit_str: String = after.chars().filter(|c| c.is_ascii_digit()).collect();
+            if !digit_str.is_empty() {
+                let val = digit_str.parse::<u32>().unwrap_or(0);
+                if val < 60 { minute = Some(val); }
+            }
+        }
+    }
+
+    let mut h = hour.unwrap_or(12);
+    if is_noon && h < 12 { /* noon stays */ }
+    else if is_pm && h < 12 { h += 12; }
+    else if is_am && h >= 12 { h -= 12; }
+    h = h.min(23);
+
+    Some(format!("{} {:02}:{:02}", base_date.format("%Y-%m-%d"), h, minute.unwrap_or(0).min(59)))
+}
+
+fn parse_month_day(s: &str) -> Option<(u32, u32)> {
+    let normalized = s.replace("号", "月").replace("日", "月");
+    let parts: Vec<&str> = normalized.split('月').collect();
+    if parts.len() >= 3 {
+        let month = parts[0].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().ok()?;
+        let day = parts[1].chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse().ok()?;
+        if (1..=12).contains(&month) && (1..=31).contains(&day) {
+            return Some((month, day));
+        }
+    }
     None
 }
