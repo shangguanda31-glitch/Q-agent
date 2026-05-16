@@ -6,7 +6,9 @@ use tokio::process::Command;
 use super::traits::{Tool, ToolResult};
 
 fn tessdata_dir() -> String {
-    std::env::var("TESSDATA_PREFIX").unwrap_or_else(|_| "tesseract/tessdata".to_string())
+    std::env::var("TESSDATA_PREFIX").unwrap_or_else(|_| {
+        format!("{}/tesseract/tessdata", env!("CARGO_MANIFEST_DIR"))
+    })
 }
 
 pub struct OcrTool;
