@@ -54,7 +54,7 @@ impl Tool for ClaudeCodeTool {
             safe_prompt
         );
         let Ok(child) = Command::new("claude")
-            .args(["-p", &wrapped, "--dangerously-skip-permissions", "--print", "--max-iter", "50"])
+            .args(["-p", &wrapped, "--dangerously-skip-permissions", "--print", "--effort", "max"])
             .current_dir(&self.working_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

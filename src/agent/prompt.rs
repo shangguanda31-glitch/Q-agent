@@ -68,8 +68,9 @@ pub fn build_system_prompt(tools: &ToolRegistry, memory_context: &str) -> String
 ### 常规
 - 需要记住的信息用 remember
 - 有日程用 schedule_create + notify_user
-- 代码/文档任务用 claude_code
+- 代码/文档任务用 claude_code，**同时在调 claude_code 之前必须先 notify_user**
 - claude_code 只完成部分时，再次调用让它继续
+- **如果 claude_code 连续失败 2 次，不要再试了**，直接告诉用户工具暂时不可用
 - 不确定时询问用户
 "#)
 }
