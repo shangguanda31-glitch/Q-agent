@@ -62,7 +62,7 @@ fn start_llama_server(cfg: &config::Config) -> (Option<std::process::Child>, Str
         let gpu_layers = cfg.llama_gpu_layers.min(40); // 8GB VRAM safe limit
         match std::process::Command::new(server_path)
             .args(["-m", &cfg.llama_model_path, "--host", "127.0.0.1", "--port", port,
-                   "-ngl", &gpu_layers.to_string(), "--ctx-size", "8192"])
+                   "-ngl", &gpu_layers.to_string(), "--ctx-size", "8192", "--embeddings", "--pooling", "mean"])
             .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
             .spawn()
         {
@@ -84,6 +84,7 @@ fn build_tool_registry(
     schedule_store: Arc<store::ScheduleStore>,
     memory_store: Arc<store::MemoryStore>,
     note_store: Arc<store::NoteStore>,
+    llm: Arc<llm::LLMClient>,
     cfg: &config::Config,
 ) -> Arc<tools::traits::ToolRegistry> {
     let mut reg = tools::traits::ToolRegistry::new();
@@ -91,8 +92,8 @@ fn build_tool_registry(
     reg.register(tools::qq_read::QQReadTool::new(napcat_api));
     reg.register(tools::schedule::ScheduleTool::new(schedule_store.clone()));
     reg.register(tools::schedule::ScheduleListTool::new(schedule_store));
-    reg.register(tools::memory::RememberTool::new(memory_store.clone()));
-    reg.register(tools::memory::RecallTool::new(memory_store));
+    reg.register(tools::memory::RememberTool::new(memory_store.clone(), llm.clone()));
+    reg.register(tools::memory::RecallTool::new(memory_store, llm));
     reg.register(tools::note_take::NoteTakeTool::new(note_store));
     reg.register(tools::ocr::OcrTool::new());
     if cfg.claude_code_enabled {
@@ -107,6 +108,9 @@ fn build_tool_registry(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env file if present (not tracked by git)
+    let _ = dotenvy::dotenv();
+
     // Disable proxy for local requests
     unsafe { std::env::set_var("NO_PROXY", "127.0.0.1,localhost"); }
     unsafe { std::env::set_var("no_proxy", "127.0.0.1,localhost"); }
@@ -147,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
     let llm = Arc::new(llm::LLMClient::new(&llm_url, &cfg.llm_model));
 
     // Tool registry
-    let tools = build_tool_registry(napcat_api.clone(), schedule_store.clone(), memory_store.clone(), note_store.clone(), &cfg);
+    let tools = build_tool_registry(napcat_api.clone(), schedule_store.clone(), memory_store.clone(), note_store.clone(), llm.clone(), &cfg);
 
     // === Spawn WebSocket listener ===
     let ws_tx = raw_tx.clone();
