@@ -130,6 +130,7 @@ impl ScheduleStore {
     pub fn mark_done(&self, id: &str) -> bool { self.0.lock().execute("UPDATE schedules SET status='done' WHERE id=?1", params![id]).ok().is_some() }
     pub fn mark_reminded(&self, id: &str) -> bool { self.0.lock().execute("UPDATE schedules SET status='reminded' WHERE id=?1", params![id]).ok().is_some() }
     pub fn delete(&self, id: &str) -> bool { self.0.lock().execute("DELETE FROM schedules WHERE id=?1", params![id]).ok().is_some() }
+    pub fn update_description(&self, id: &str, desc: &str) -> bool { self.0.lock().execute("UPDATE schedules SET description=?1 WHERE id=?2", params![desc, id]).ok().is_some() }
     pub fn get_due_for_reminder(&self, within_minutes: i64) -> Vec<ScheduleEntry> {
         let now = chrono::Local::now();
         self.list().into_iter().filter(|e| (e.status=="pending"||e.status=="confirmed") && e.time_parsed.as_ref().and_then(|tp|chrono::NaiveDateTime::parse_from_str(tp,"%Y-%m-%d %H:%M").ok()).map(|dt|{let dtl:chrono::DateTime<chrono::Local>=chrono::TimeZone::from_local_datetime(&chrono::Local,&dt).unwrap();(dtl-now).num_minutes()}).map(|m|m>=0&&m<=within_minutes).unwrap_or(false)).collect()

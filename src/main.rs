@@ -91,7 +91,8 @@ fn build_tool_registry(
     reg.register(tools::notify::NotifyTool::new());
     reg.register(tools::qq_read::QQReadTool::new(napcat_api));
     reg.register(tools::schedule::ScheduleTool::new(schedule_store.clone()));
-    reg.register(tools::schedule::ScheduleListTool::new(schedule_store));
+    reg.register(tools::schedule::ScheduleListTool::new(schedule_store.clone()));
+    reg.register(tools::schedule::ScheduleUpdateTool::new(schedule_store.clone()));
     reg.register(tools::memory::RememberTool::new(memory_store.clone(), llm.clone()));
     reg.register(tools::memory::RecallTool::new(memory_store, llm));
     reg.register(tools::note_take::NoteTakeTool::new(note_store));
