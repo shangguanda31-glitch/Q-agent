@@ -242,7 +242,8 @@ async fn handle_message(
                 if seg.segment_type == "image" {
                     if let Some(url) = seg.image_url() {
                         if let Some(data) = napcat_api.download_file(&url).await {
-                            let filename = format!("img_{}_{}.jpg", msg.user_id, idx);
+                            let ts = chrono::Local::now().format("%H%M%S%3f");
+                            let filename = format!("img_{}_{}_{}.jpg", msg.user_id, ts, idx);
                             let local = format!("image_cache/{}", filename);
                             let _ = std::fs::write(&local, &data);
                             if image_b64.is_none() { image_b64 = Some(base64::engine::general_purpose::STANDARD.encode(&data)); image_path = Some(local); }
