@@ -154,4 +154,23 @@ impl LLMClient {
 
         Ok(content.trim().to_string())
     }
+
+    /// Generate embedding vector for text via /v1/embeddings
+    pub async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>> {
+        let body = serde_json::json!({
+            "model": self.model,
+            "input": text,
+        });
+        let resp = self.client.post(format!("{}/v1/embeddings", self.base_url)).json(&body).send().await?;
+        let status = resp.status();
+        let resp_text = resp.text().await.unwrap_or_default();
+        if !status.is_success() {
+            anyhow::bail!("Embedding API returned {}: {}", status, resp_text.chars().take(200).collect::<String>());
+        }
+        let result: serde_json::Value = serde_json::from_str(&resp_text)?;
+        let data = result.pointer("/data/0/embedding")
+            .ok_or_else(|| anyhow::anyhow!("No embedding in response"))?;
+        let emb: Vec<f32> = serde_json::from_value(data.clone())?;
+        Ok(emb)
+    }
 }

@@ -191,6 +191,7 @@ pub struct MemoryEntry {
     pub tags: Vec<String>,
     pub source: String,
     pub created_at: String,
+    pub embedding: Option<Vec<f32>>,
 }
 
 pub struct MemoryStore {
@@ -218,12 +219,13 @@ impl MemoryStore {
         }
     }
 
-    pub fn write(&self, content: String, tags: Vec<String>, source: String) -> MemoryEntry {
+    pub fn write(&self, content: String, tags: Vec<String>, source: String, embedding: Option<Vec<f32>>) -> MemoryEntry {
         let entry = MemoryEntry {
             id: uuid::Uuid::new_v4().to_string(),
             content,
             tags,
             source,
+            embedding,
             created_at: chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
         };
         let mut entries = self.entries.lock().unwrap();
@@ -233,20 +235,28 @@ impl MemoryStore {
         entry
     }
 
-    pub fn read(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
+    /// Search memories by embedding cosine similarity, fallback to keyword
+    pub fn read(&self, query_embedding: Option<&[f32]>, query_text: &str, limit: usize) -> Vec<MemoryEntry> {
         let entries = self.entries.lock().unwrap();
-        let q = query.to_lowercase();
-        let mut matched: Vec<_> = entries.iter().filter(|e| {
-            e.content.to_lowercase().contains(&q)
-                || e.tags.iter().any(|t| t.to_lowercase().contains(&q))
-        }).cloned().collect();
-        matched.reverse();
-        matched.truncate(limit);
-        matched
+        let mut scored: Vec<(f32, MemoryEntry)> = entries.iter().map(|e| {
+            let score = match (query_embedding, e.embedding.as_deref()) {
+                (Some(qe), Some(ee)) => cosine_similarity(qe, ee),
+                _ => 0.0,
+            };
+            // Boost by keyword match as fallback
+            let kw = if score < 0.1 {
+                let q = query_text.to_lowercase();
+                if e.content.to_lowercase().contains(&q) || e.tags.iter().any(|t| t.to_lowercase().contains(&q)) { 0.5 } else { 0.0 }
+            } else { 0.0 };
+            (score + kw, e.clone())
+        }).collect();
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(limit);
+        scored.into_iter().map(|(_, e)| e).collect()
     }
 
     pub fn load_context(&self, query: &str, max_entries: usize) -> String {
-        let relevant = self.read(query, max_entries);
+        let relevant = self.read(None, query, max_entries);
         if relevant.is_empty() { return String::new(); }
         let mut lines = vec!["[相关记忆]".to_string()];
         for m in &relevant {
@@ -261,6 +271,15 @@ impl MemoryStore {
         sorted.reverse();
         sorted
     }
+}
+
+/// Cosine similarity between two float vectors
+pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let na: f32 = a.iter().map(|x| x * x).sum();
+    let nb: f32 = b.iter().map(|x| x * x).sum();
+    let denom = na.sqrt() * nb.sqrt();
+    if denom < 1e-10 { 0.0 } else { dot / denom }
 }
 
 // === Note Store (conversation notes) ===

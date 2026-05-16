@@ -2,15 +2,17 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
+use crate::llm::LLMClient;
 use crate::store::MemoryStore;
 use super::traits::{Tool, ToolResult};
 
 pub struct RememberTool {
     store: Arc<MemoryStore>,
+    llm: Arc<LLMClient>,
 }
 
 impl RememberTool {
-    pub fn new(store: Arc<MemoryStore>) -> Arc<Self> { Arc::new(Self { store }) }
+    pub fn new(store: Arc<MemoryStore>, llm: Arc<LLMClient>) -> Arc<Self> { Arc::new(Self { store, llm }) }
 }
 
 #[async_trait]
@@ -34,17 +36,22 @@ impl Tool for RememberTool {
     async fn execute(&self, args: Value) -> ToolResult {
         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
         if content.is_empty() { return ToolResult::fail("内容不能为空"); }
-        self.store.write(content.to_string(), vec!["user".to_string()], "llm".to_string());
+
+        // Generate embedding for semantic search
+        let embedding = self.llm.embed(content).await.ok();
+
+        self.store.write(content.to_string(), vec!["user".to_string()], "llm".to_string(), embedding);
         ToolResult::ok(format!("已记住：{}", content))
     }
 }
 
 pub struct RecallTool {
     store: Arc<MemoryStore>,
+    llm: Arc<LLMClient>,
 }
 
 impl RecallTool {
-    pub fn new(store: Arc<MemoryStore>) -> Arc<Self> { Arc::new(Self { store }) }
+    pub fn new(store: Arc<MemoryStore>, llm: Arc<LLMClient>) -> Arc<Self> { Arc::new(Self { store, llm }) }
 }
 
 #[async_trait]
@@ -52,14 +59,14 @@ impl Tool for RecallTool {
     fn name(&self) -> &str { "recall" }
 
     fn description(&self) -> &str {
-        "回忆之前记住的信息。用关键词搜索即可。"
+        "回忆之前记住的信息。用自然语言描述你想找的内容即可，会进行语义匹配。"
     }
 
     fn parameters_schema(&self) -> Value {
         serde_json::json!({
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "搜索关键词"}
+                "query": {"type": "string", "description": "搜索描述，用自然语言描述你想找的信息"}
             },
             "required": ["query"]
         })
@@ -68,7 +75,11 @@ impl Tool for RecallTool {
     async fn execute(&self, args: Value) -> ToolResult {
         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
         if query.is_empty() { return ToolResult::fail("查询词不能为空"); }
-        let results = self.store.read(query, 10);
+
+        // Generate embedding for query
+        let query_emb = self.llm.embed(query).await.ok();
+
+        let results = self.store.read(query_emb.as_deref(), query, 10);
         if results.is_empty() { return ToolResult::ok("未找到相关记忆"); }
         let output: Vec<String> = results.iter().map(|e| format!("- {}", e.content)).collect();
         ToolResult::ok(format!("找到 {} 条：\n{}", results.len(), output.join("\n")))
