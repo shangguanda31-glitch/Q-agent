@@ -56,7 +56,7 @@ impl Tool for ScheduleUpdateTool {
     fn name(&self) -> &str { "schedule_update" }
 
     fn description(&self) -> &str {
-        "更新已有日程的信息。当后续消息补充了地点、参与人等详情时，用此工具将新信息追加到原有日程中。优先使用 id 参数精确匹配。"
+        "更新已有日程的信息；如果未找到匹配日程则自动创建新日程。当后续消息补充了地点、参与人等详情时，用此工具将新信息追加到原有日程中。优先使用 id 参数精确匹配。"
     }
 
     fn parameters_schema(&self) -> Value {
@@ -110,8 +110,10 @@ impl Tool for ScheduleUpdateTool {
                 ToolResult::ok(format!("已更新日程「{}」：{}", e.title, info))
             }
             None => {
-                let hint = if !title.is_empty() { format!("「{}」", title) } else { "".to_string() };
-                ToolResult::fail(format!("未找到匹配的日程{}", hint))
+                let new_title = if !title.is_empty() { title } else { "日程" };
+                let entry = self.store.create(new_title.to_string(), time.clone(), Some(info.to_string()),
+                    "QQ消息".to_string(), "LLM提取".to_string());
+                ToolResult::ok(format!("未找到匹配日程，已自动创建「{}」(ID: {})：{}", entry.title, entry.id, info))
             }
         }
     }
