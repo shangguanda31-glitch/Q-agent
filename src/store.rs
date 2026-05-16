@@ -199,8 +199,8 @@ impl MemoryStore {
         out
     }
 
-    pub fn load_context(&self, query: &str, max_entries: usize) -> String {
-        let entries = self.read(None, query, max_entries);
+    pub fn load_context(&self, query_embedding: Option<&[f32]>, query: &str, max_entries: usize) -> String {
+        let entries = self.read(query_embedding, query, max_entries);
         if entries.is_empty() { return String::new(); }
         let mut lines = vec!["[相关记忆]".to_string()];
         for m in &entries { lines.push(format!("- {} (标签: {})", m.content, m.tags.join(", "))); }
