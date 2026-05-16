@@ -111,14 +111,22 @@ cargo run --release
 |---------|--------|------|
 | `NAPCAT_WS_URL` | `ws://127.0.0.1:4447` | NapCatQQ WebSocket |
 | `NAPCAT_HTTP_URL` | `http://127.0.0.1:4444` | NapCatQQ HTTP API |
-| `NAPCAT_TOKEN` | — | 鉴权 Token（必须设置）|
+| `NAPCAT_TOKEN` | `your_token_here` | 鉴权 Token（必须设置实际值）|
 | `WEB_PORT` | `5050` | Web 面板端口 |
+| `DATA_DIR` | `data` | 数据目录（SQLite 存储位置）|
 | `LLM_URL` | `http://127.0.0.1:8081` | LLM API 地址 |
-| `LLAMA_MODEL_PATH` | `models/qwen3.5...gguf` | 模型文件路径 |
+| `EMBED_URL` | `http://127.0.0.1:8082` | Embedding API 地址 |
+| `LLM_MODEL` | `qwen3.5-9b` | 模型名称（传给 API）|
 | `LLAMA_SERVER_PATH` | `llama-server` | llama-server 路径 |
+| `LLAMA_MODEL_PATH` | `models/qwen3.5-9b-q4_k_m.gguf` | LLM 模型文件路径 |
+| `EMBED_MODEL_PATH` | `models/qwen3.5-0.8b-q6_k.gguf` | Embedding 模型文件路径 |
+| `LLAMA_GPU_LAYERS` | `99` | GPU 层数（笔记本 5070 建议 40）|
+| `MAX_TOOL_ITERATIONS` | `10` | Agent 循环最大轮数 |
+| `CLAUDE_CODE_ENABLED` | `true` | 是否启用 Claude Code |
 | `CLAUDE_CODE_TIMEOUT` | `1800` | Claude Code 超时（秒）|
-| `TESSERACT_PATH` | — | Tesseract 路径 |
-| `TESSDATA_PREFIX` | `tesseract/tessdata` | Tesseract 语言数据 |
+| `CLAUDE_WORKING_DIR` | `claude_workspace` | Claude Code 工作目录 |
+| `TESSERACT_PATH` | — | Tesseract 可执行文件路径 |
+| `TESSDATA_PREFIX` | `tesseract/tessdata` | Tesseract 语言数据目录 |
 
 ## 项目结构
 
