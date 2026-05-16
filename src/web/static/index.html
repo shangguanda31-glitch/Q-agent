@@ -91,6 +91,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-seri
       <div class="nav-tab" data-tab="notes" onclick="switchTab('notes')">📝 笔记</div>
       <div class="nav-tab" data-tab="memories" onclick="switchTab('memories')">🧠 记忆</div>
       <div class="nav-tab" data-tab="workspace" onclick="switchTab('workspace')">📁 文件</div>
+	      <div class="nav-tab" data-tab="exclusions" onclick="switchTab('exclusions')">🚫 排除</div>
     </div>
     <div class="list-scroll" id="listContent"></div>
     <div class="stats-bar"><span>📊 <b id="statTotal">0</b></span><span>💬 <b id="statConv">0</b></span><span>📅 <b id="statSched">0</b></span><span>📝 <b id="statNotes">0</b></span></div>
@@ -131,7 +132,7 @@ html+='</div>';mainArea.innerHTML=html;setTimeout(()=>{const b=mainArea.querySel
 
 function switchTab(t){tab=t;document.querySelectorAll('.nav-tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===t))
 mainArea.innerHTML='<div class="placeholder"><div class="icon">◈</div><div>选择项目查看详情</div></div>'
-if(t==='messages')renderConvs();else if(t==='schedules')renderSchedules();else if(t==='notes')renderNotes();else if(t==='memories')renderMemories();else if(t==='workspace')renderWorkspace()}
+if(t==='messages')renderConvs();else if(t==='schedules')renderSchedules();else if(t==='notes')renderNotes();else if(t==='memories')renderMemories();else if(t==='workspace')renderWorkspace();else if(t==='exclusions')renderExclusions()}
 
 async function updateStats(){try{const s=await(await fetch('/api/schedules')).json();$('statSched').textContent=s.length}catch(e){}try{const n=await(await fetch('/api/notes')).json();$('statNotes').textContent=n.length}catch(e){}$('statTotal').textContent=messages.length;$('statConv').textContent=getChats().length}
 
@@ -157,6 +158,23 @@ async function renderWorkspace(){try{const r=await(await fetch('/api/workspace')
 listContent.innerHTML=r.map(f=>'<div class="list-item" onclick="showFile(\''+esc(f)+'\')"><div class="li-body"><div class="li-title">📄 '+esc(f)+'</div></div></div>').join('')}catch(e){}}
 async function showFile(n){try{mainArea.innerHTML='<div class="chat-header"><div class="name">📁 '+esc(n)+'</div></div><div class="chat-body">'+(await(await fetch('/api/workspace/'+n)).text())+'</div>'}catch(e){}}
 
+
+async function renderExclusions(){try{const r=await(await fetch('/api/chat-sources')).json()
+const ex=await(await fetch('/api/exclusions')).json()
+const excluded=new Set(ex.map(e=>e.exclude_type+':'+e.target_id))
+let html='<div style="padding:10px 14px;font-size:12px;color:var(--text2)">点击切换排除状态</div>'
+if(r.groups?.length){html+='<div style="padding:6px 14px;font-size:11px;color:var(--text3);font-weight:600">📋 群聊</div>'
+r.groups.forEach(g=>{const ex=excluded.has('group:'+g.id)
+html+='<div class="schedule-item"><div style="font-size:14px;cursor:pointer" onclick="toggleExclude(\'group\','+g.id+')">'+(ex?'🔴':'🟢')+'</div><div style="flex:1"><div style="font-weight:600;font-size:13px">'+esc(g.name)+'</div><div style="font-size:11px;color:var(--text2)">ID: '+g.id+(ex?' <span style="color:var(--red)">已排除</span>':'')+'</div></div></div>'})}
+if(r.friends?.length){html+='<div style="padding:6px 14px;font-size:11px;color:var(--text3);font-weight:600;margin-top:4px">👤 好友</div>'
+r.friends.forEach(f=>{const ex=excluded.has('user:'+f.id)
+html+='<div class="schedule-item"><div style="font-size:14px;cursor:pointer" onclick="toggleExclude(\'user\','+f.id+')">'+(ex?'🔴':'🟢')+'</div><div style="flex:1"><div style="font-weight:600;font-size:13px">'+esc(f.name)+'</div><div style="font-size:11px;color:var(--text2)">ID: '+f.id+(ex?' <span style="color:var(--red)">已排除</span>':'')+'</div></div></div>'})}
+listContent.innerHTML=html||'<div class="empty-state">无法获取群列表</div>'
+}catch(e){listContent.innerHTML='<div class="empty-state">加载失败</div>'}}
+async function toggleExclude(t,i){const ex=await(await fetch('/api/exclusions')).json()
+const isEx=ex.some(e=>e.exclude_type===t&&e.target_id===i)
+await fetch('/api/exclusions/'+(isEx?'remove':'add'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({exclude_type:t,target_id:i})})
+renderExclusions()}
 function previewImg(s){const o=document.createElement('div');o.className='img-overlay';o.onclick=()=>o.remove();const i=document.createElement('img');i.src=s;o.appendChild(i);document.body.appendChild(o)}
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 listContent.innerHTML='<div class="empty-state">等待消息...</div>';
