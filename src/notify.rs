@@ -11,8 +11,10 @@ $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateCont
 $textNodes = $template.GetElementsByTagName('text')
 $textNodes.Item(0).AppendChild($template.CreateTextNode('{0}')) | Out-Null
 $textNodes.Item(1).AppendChild($template.CreateTextNode('{1}')) | Out-Null
+$toastEl = $template.SelectSingleNode('/toast')
+$toastEl.SetAttribute('duration', 'long')
 $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('QQ Assistant').Show($toast)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('QAgent').Show($toast)
 "#,
         safe_title, safe_body
     );
