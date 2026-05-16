@@ -98,4 +98,34 @@ impl NapCatApi {
             .ok()
             .map(|b| b.to_vec())
     }
+
+    pub async fn get_group_list(&self) -> Vec<Value> {
+        let resp = self.client
+            .post(format!("{}/get_group_list", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await;
+        match resp {
+            Ok(r) => match r.json::<Value>().await {
+                Ok(v) => v.get("data").and_then(|d| d.as_array()).cloned().unwrap_or_default(),
+                Err(_) => vec![],
+            },
+            Err(_) => vec![],
+        }
+    }
+
+    pub async fn get_friend_list(&self) -> Vec<Value> {
+        let resp = self.client
+            .post(format!("{}/get_friend_list", self.base_url))
+            .header("Authorization", self.auth_header())
+            .send()
+            .await;
+        match resp {
+            Ok(r) => match r.json::<Value>().await {
+                Ok(v) => v.get("data").and_then(|d| d.as_array()).cloned().unwrap_or_default(),
+                Err(_) => vec![],
+            },
+            Err(_) => vec![],
+        }
+    }
 }

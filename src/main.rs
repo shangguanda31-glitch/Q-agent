@@ -225,15 +225,15 @@ async fn main() -> anyhow::Result<()> {
     let agent_store = event_store.clone();
     let agent_sched = schedule_store.clone();
     let agent_tools = tools.clone();
+    let exclusion_store = Arc::new(store::ExclusionStore::new(&cfg.data_dir));
     let agent_max = cfg.max_tool_iterations;
     let agent_ch = chat_history.clone();
     let agent_mem = memory_store.clone();
-    let agent_excluded_groups = cfg.excluded_groups.clone();
-    let agent_excluded_users = cfg.excluded_users.clone();
+    let agent_ex = exclusion_store.clone();
     tokio::spawn(async move {
         agent::run(agent_rx, agent_llm, agent_api, (*agent_tx).clone(), agent_store,
                    agent_sched, agent_tools, agent_max, agent_ch, agent_mem,
-                   agent_excluded_groups, agent_excluded_users).await;
+                   agent_ex).await;
     });
 
     // === Spawn Web Server ===
@@ -244,7 +244,7 @@ async fn main() -> anyhow::Result<()> {
     let web_memories = memory_store.clone();
     let web_port = cfg.web_port;
     tokio::spawn(async move {
-        let app = web::router(web_tx, web_store, web_sched, web_notes, web_memories);
+        let app = web::router(web_tx, web_store, web_sched, web_notes, web_memories, exclusion_store.clone(), napcat_api.clone());
         let ports = [web_port, 5051, 5052, 5053];
         for &port in &ports {
             match tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await {
