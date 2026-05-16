@@ -37,6 +37,8 @@ pub fn router(
         .route("/api/workspace", get(workspace_list))
         .route("/api/workspace/{*path}", get(workspace_file))
         .nest_service("/images", ServeDir::new("image_cache"))
+        .route("/api/memories/delete", post(memory_delete))
+        .route("/api/notes/delete", post(note_delete))
         .nest_service("/workspace_files", ServeDir::new("claude_workspace"))
         .layer(CorsLayer::permissive())
         .with_state(state)
@@ -88,4 +90,11 @@ async fn workspace_file(Path(path): Path<String>) -> impl IntoResponse {
 
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+async fn memory_delete(State(state): State<AppState>, Json(req): Json<IdReq>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": state.memories.delete(&req.id)}))
+}
+async fn note_delete(State(state): State<AppState>, Json(req): Json<IdReq>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": state.notes.delete(&req.id)}))
 }

@@ -205,6 +205,9 @@ impl MemoryStore {
         for m in &entries { lines.push(format!("- {} (标签: {})", m.content, m.tags.join(", "))); }
         lines.join("\n")
     }
+    pub fn delete(&self, id: &str) -> bool {
+        self.0.lock().execute("DELETE FROM memories WHERE id=?1", params![id]).ok().is_some()
+    }
 }
 
 // === Note Store ===
@@ -246,8 +249,11 @@ impl NoteStore {
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| Ok(NoteEntry{id:r.get(0)?,content:r.get(1)?,speaker:r.get(2)?,speaker_id:r.get(3)?,source:r.get(4)?,group_id:r.get(5)?,message_time:r.get(6)?,created_at:r.get(7)?})) {
             for row in rows { if let Ok(e) = row { out.push(e); } }
-        }
+    }
         out
+    }
+    pub fn delete(&self, id: &str) -> bool {
+        self.0.lock().execute("DELETE FROM notes WHERE id=?1", params![id]).ok().is_some()
     }
 }
 
