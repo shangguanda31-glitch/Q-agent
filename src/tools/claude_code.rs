@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Semaphore;
 use tracing::warn;
@@ -43,7 +43,6 @@ impl Tool for ClaudeCodeTool {
     }
 
     async fn execute(&self, args: Value) -> ToolResult {
-        // Queue: only one claude_code runs at a time
         let _permit = self.queue.acquire().await.expect("semaphore closed");
         let prompt = match args.get("prompt").and_then(|v| v.as_str()) {
             Some(p) => p,
@@ -59,7 +58,9 @@ impl Tool for ClaudeCodeTool {
         );
 
         let mut child = match Command::new("claude")
-            .args(["-p", &wrapped, "--dangerously-skip-permissions", "--print", "--effort", "max"])
+            .args(["-p", &wrapped, "--dangerously-skip-permissions",
+                   "--output-format", "stream-json", "--include-partial-messages", "--verbose",
+                   "--effort", "max"])
             .current_dir(&self.working_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -71,59 +72,125 @@ impl Tool for ClaudeCodeTool {
             ),
         };
 
-        let mut child_stdout = child.stdout.take().expect("stdout piped");
+        let child_stdout = child.stdout.take().expect("stdout piped");
+        let reader = BufReader::new(child_stdout);
+        let mut lines = reader.lines();
 
-        // Heartbeat: periodic notifications while claude_code runs
         let start = std::time::Instant::now();
-        let heartbeat = tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                let elapsed = start.elapsed().as_secs();
-                crate::notify::send_toast(&format!("Claude Code {}s", elapsed), "处理中，请稍候...");
-            }
-        });
+        let mut last_notify = std::time::Instant::now();
+        let mut final_text = String::new();
+        let mut thinking_buf = String::new();
 
-        // Read stdout for the final response
         let timeout_duration = std::time::Duration::from_secs(self.timeout_secs);
-        let mut output_buf = Vec::new();
-        let read_result = tokio::time::timeout(timeout_duration, child_stdout.read_to_end(&mut output_buf)).await;
 
-        // Wait for process exit
-        let status = child.wait().await.ok();
-
-        // Stop heartbeat
-        heartbeat.abort();
-
-        let mut stdout = String::from_utf8_lossy(&output_buf).to_string();
-
-        if stdout.len() > self.max_output_bytes {
-            stdout.truncate(self.max_output_bytes);
-            stdout.push_str("\n...(输出已截断)");
-        }
-
-        // Handle timeout vs completion
-        if read_result.is_err() {
-            return ToolResult::fail(format!("Claude Code 执行超时 ({}s)\n部分输出:\n{}", self.timeout_secs, stdout));
-        }
-
-        let success = status.map(|s| s.success()).unwrap_or(false);
-
-        if success {
-            let workspace = &self.working_dir;
-            let file_list = match std::fs::read_dir(workspace) {
-                Ok(entries) => {
-                    let files: Vec<String> = entries.filter_map(|e| e.ok()).filter(|e| e.path().is_file())
-                        .map(|e| e.file_name().to_string_lossy().to_string()).collect();
-                    if files.is_empty() { String::new() }
-                    else { format!("\n\n创建工作区文件：{}", files.join(", ")) }
+        loop {
+            let line = tokio::time::timeout(timeout_duration, lines.next_line()).await;
+            let line = match line {
+                Ok(Ok(Some(l))) => l,
+                Ok(Ok(None)) => break, // EOF
+                Ok(Err(e)) => {
+                    // stdout read error (e.g. broken pipe) - process may have exited
+                    break;
                 }
-                Err(_) => String::new()
+                Err(_) => {
+                    // Overall timeout
+                    let _ = child.kill().await;
+                    return ToolResult::fail(format!("Claude Code 执行超时 ({}s)\n部分输出:\n{}",
+                        self.timeout_secs, truncate(&final_text, self.max_output_bytes)));
+                }
             };
-            ToolResult::ok(format!("{}{}", stdout, file_list))
-        } else {
-            warn!("Claude Code returned non-zero exit");
-            ToolResult::fail(format!("Claude Code 返回错误:\n{}", stdout))
+
+            if let Ok(json) = serde_json::from_str::<Value>(&line) {
+                let typ = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+                match typ {
+                    "stream_event" => {
+                        if let Some(event) = json.get("event") {
+                            let event_type = event.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                            match event_type {
+                                "content_block_delta" => {
+                                    if let Some(delta) = event.get("delta") {
+                                        if let Some(think) = delta.get("thinking").and_then(|v| v.as_str()) {
+                                            thinking_buf.push_str(think);
+                                            // Notify when we have meaningful thinking
+                                            if last_notify.elapsed() >= std::time::Duration::from_secs(10)
+                                                && thinking_buf.len() > 20 {
+                                                let preview: String = thinking_buf.chars().take(60).collect();
+                                                crate::notify::send_toast(
+                                                    &format!("Claude Code {}s", start.elapsed().as_secs()),
+                                                    &preview);
+                                                last_notify = std::time::Instant::now();
+                                                thinking_buf.clear();
+                                            }
+                                        }
+                                    }
+                                }
+                                "tool_use_start" => {
+                                    let name = event.get("name").and_then(|v| v.as_str()).unwrap_or("tool");
+                                    crate::notify::send_toast(
+                                        &format!("Claude Code {}s", start.elapsed().as_secs()),
+                                        &format!("正在{}...", name));
+                                    last_notify = std::time::Instant::now();
+                                    // Flush thinking on tool use
+                                    if !thinking_buf.is_empty() && thinking_buf.len() > 20 {
+                                        thinking_buf.clear();
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    "assistant" => {
+                        // Final result
+                        if let Some(content) = json.pointer("/message/content") {
+                            if let Some(parts) = content.as_array() {
+                                for part in parts {
+                                    if let Some(text) = part.get("text").and_then(|v| v.as_str()) {
+                                        final_text.push_str(text);
+                                    }
+                                }
+                            }
+                        }
+                        // Also check top-level text field
+                        if let Some(text) = json.get("text").and_then(|v| v.as_str()) {
+                            final_text.push_str(text);
+                        }
+                    }
+                    "system" => {
+                        // System events (init, status, etc.)
+                    }
+                    _ => {}
+                }
+            }
         }
+
+        let _ = child.wait().await;
+
+        if final_text.is_empty() {
+            final_text = "任务完成（无文本输出）".to_string();
+        }
+
+        let workspace = &self.working_dir;
+        let file_list = match std::fs::read_dir(workspace) {
+            Ok(entries) => {
+                let files: Vec<String> = entries.filter_map(|e| e.ok()).filter(|e| e.path().is_file())
+                    .map(|e| e.file_name().to_string_lossy().to_string()).collect();
+                if files.is_empty() { String::new() }
+                else { format!("\n\n创建工作区文件：{}", files.join(", ")) }
+            }
+            Err(_) => String::new()
+        };
+
+        let output = format!("{}{}", truncate(&final_text, self.max_output_bytes), file_list);
+        ToolResult::ok(output)
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() > max {
+        format!("{}...\n(输出已截断)", &s[..max])
+    } else {
+        s.to_string()
     }
 }
 
