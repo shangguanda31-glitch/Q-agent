@@ -36,6 +36,7 @@ pub fn router(
         .route("/api/memories", get(memories_list))
         .route("/api/workspace", get(workspace_list))
         .route("/api/workspace/{*path}", get(workspace_file))
+        .route("/api/claude-progress", get(claude_progress))
         .nest_service("/images", ServeDir::new("image_cache"))
         .route("/api/memories/delete", post(memory_delete))
         .route("/api/notes/delete", post(note_delete))
@@ -85,6 +86,13 @@ async fn workspace_file(Path(path): Path<String>) -> impl IntoResponse {
     match tokio::fs::read_to_string(&path).await {
         Ok(content) => Html(format!("<pre>{}</pre>", html_escape(&content))),
         Err(_) => Html("<p>File not found or binary</p>".to_string()),
+    }
+}
+
+async fn claude_progress() -> Json<serde_json::Value> {
+    match tokio::fs::read_to_string("claude_workspace/.claude_progress").await {
+        Ok(content) => Json(serde_json::json!({"progress": content})),
+        Err(_) => Json(serde_json::json!({"progress": ""})),
     }
 }
 
