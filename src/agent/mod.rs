@@ -208,8 +208,9 @@ async fn handle_message(
     let mut final_response = String::new();
 
     for iteration in 0..max_iterations {
-        const MAX_TOKENS: usize = 6144;
-        let est_tokens: usize = system_prompt.len() / 4 + messages.iter().map(|m| m.content.len() / 4 + 10).sum::<usize>();
+        // Chinese text ~1.5-2 tokens/char, so byte_len*2/5 is closer than byte_len/4
+        const MAX_TOKENS: usize = 4096;
+        let est_tokens: usize = system_prompt.len() * 2 / 5 + messages.iter().map(|m| m.content.len() * 2 / 5 + 10).sum::<usize>();
         if est_tokens > MAX_TOKENS && messages.len() > 6 {
             let split = messages.len().saturating_sub(4);
             let old_msgs = messages.drain(..split).collect::<Vec<_>>();
@@ -299,3 +300,4 @@ async fn handle_message(
     event_store.push(processed.clone());
     let _ = processed_tx.send(processed);
 }
+
