@@ -17,7 +17,8 @@ fn open_db(path: &str) -> parking_lot::Mutex<Connection> {
          CREATE TABLE IF NOT EXISTS schedules(id TEXT PRIMARY KEY,title TEXT,time TEXT,time_parsed TEXT,description TEXT,source TEXT,source_user TEXT,status TEXT,created_at TEXT);
          CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY,content TEXT,tags TEXT,source TEXT,created_at TEXT,embedding TEXT);
          CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,content TEXT,speaker TEXT,speaker_id INTEGER,source TEXT,group_id INTEGER,message_time TEXT,created_at TEXT);
-         CREATE TABLE IF NOT EXISTS exclusions(id INTEGER PRIMARY KEY AUTOINCREMENT,exclude_type TEXT NOT NULL,target_id INTEGER NOT NULL,note TEXT,created_at TEXT,UNIQUE(exclude_type,target_id));"
+         CREATE TABLE IF NOT EXISTS exclusions(id INTEGER PRIMARY KEY AUTOINCREMENT,exclude_type TEXT NOT NULL,target_id INTEGER NOT NULL,note TEXT,created_at TEXT,UNIQUE(exclude_type,target_id));
+         CREATE TABLE IF NOT EXISTS chat_history(chat_id TEXT NOT NULL,role TEXT NOT NULL,content TEXT NOT NULL,msg_time TEXT,seq INTEGER DEFAULT 0);"
     ).ok();
     parking_lot::Mutex::new(conn)
 }
@@ -321,20 +322,60 @@ impl ExclusionStore {
 #[derive(Debug,Clone,Serialize,Deserialize)]
 pub struct ChatMessage { pub role: String, pub content: String, pub name: Option<String> }
 
-pub struct MessageHistoryStore { history: Mutex<HashMap<String, VecDeque<ChatMessage>>>, max_per_chat: usize }
+pub struct MessageHistoryStore {
+    history: Mutex<HashMap<String, VecDeque<ChatMessage>>>,
+    db: parking_lot::Mutex<Connection>,
+    max_per_chat: usize,
+}
 
 impl MessageHistoryStore {
-    pub fn new(max_per_chat: usize) -> Self { Self { history: Mutex::new(HashMap::new()), max_per_chat } }
+    pub fn new(data_dir: &str, max_per_chat: usize) -> Self {
+        let dir = PathBuf::from(data_dir);
+        let db = open_db(&dir.join("data.db").to_string_lossy());
+        let store = Self { history: Mutex::new(HashMap::new()), db, max_per_chat };
+        store.load_from_db();
+        store
+    }
+
+    fn load_from_db(&self) {
+        let conn = self.db.lock();
+        let mut stmt = match conn.prepare("SELECT chat_id,role,content FROM chat_history ORDER BY seq ASC") {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        if let Ok(rows) = stmt.query_map([], |r| {
+            Ok((r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?))
+        }) {
+            let mut h = self.history.lock().unwrap();
+            for row in rows.flatten() {
+                let e = h.entry(row.0).or_insert_with(|| VecDeque::with_capacity(self.max_per_chat));
+                if e.len() < self.max_per_chat {
+                    e.push_back(ChatMessage { role: row.1, content: row.2, name: None });
+                }
+            }
+        }
+    }
+
     pub fn push(&self, chat_id: &str, msg: ChatMessage) {
+        let ts = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%:z").to_string();
+        self.db.lock().execute(
+            "INSERT INTO chat_history(chat_id,role,content,msg_time,seq) VALUES(?1,?2,?3,?4,COALESCE((SELECT MAX(seq)+1 FROM chat_history WHERE chat_id=?1),0))",
+            params![chat_id, msg.role, msg.content, ts],
+        ).ok();
         let mut h = self.history.lock().unwrap();
         let e = h.entry(chat_id.to_string()).or_insert_with(|| VecDeque::with_capacity(self.max_per_chat));
         if e.len() >= self.max_per_chat { e.pop_front(); }
         e.push_back(msg);
     }
+
     pub fn recent(&self, chat_id: &str, count: usize) -> Vec<ChatMessage> {
         self.history.lock().unwrap().get(chat_id).map(|e| e.iter().rev().take(count).cloned().collect()).unwrap_or_default()
     }
-    pub fn clear(&self, chat_id: &str) { self.history.lock().unwrap().remove(chat_id); }
+
+    pub fn clear(&self, chat_id: &str) {
+        self.db.lock().execute("DELETE FROM chat_history WHERE chat_id=?1", params![chat_id]).ok();
+        self.history.lock().unwrap().remove(chat_id);
+    }
 }
 
 // === Util ===

@@ -194,7 +194,7 @@ async fn main() -> anyhow::Result<()> {
     let schedule_store = Arc::new(store::ScheduleStore::new(&cfg.data_dir));
     let memory_store = Arc::new(store::MemoryStore::new(&cfg.data_dir));
     let note_store = Arc::new(store::NoteStore::new(&cfg.data_dir));
-    let chat_history = Arc::new(store::MessageHistoryStore::new(50));
+    let chat_history = Arc::new(store::MessageHistoryStore::new(&cfg.data_dir, 50));
 
     // API clients
     let napcat_api = Arc::new(napcat::api::NapCatApi::new(&cfg.napcat_http_url, &cfg.napcat_token));
