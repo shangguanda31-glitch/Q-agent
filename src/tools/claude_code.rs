@@ -17,7 +17,7 @@ pub struct ClaudeCodeTool {
 
 impl ClaudeCodeTool {
     pub fn new(timeout_secs: u64, max_output_bytes: usize, working_dir: &str) -> Arc<Self> {
-        Arc::new(Self { timeout_secs, max_output_bytes, working_dir: working_dir.to_string(), queue: Semaphore::new(1) })
+        Arc::new(Self { timeout_secs, max_output_bytes, working_dir: working_dir.to_string(), queue: Semaphore::new(2) })
     }
 }
 
