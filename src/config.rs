@@ -15,6 +15,8 @@ pub struct Config {
     pub claude_code_timeout_secs: u64,
     pub claude_working_dir: String,
     pub data_dir: String,
+    pub excluded_groups: Vec<i64>,
+    pub excluded_users: Vec<i64>,
 }
 
 impl Config {
@@ -41,6 +43,14 @@ impl Config {
             claude_code_timeout_secs: std::env::var("CLAUDE_CODE_TIMEOUT").ok().and_then(|v| v.parse().ok()).unwrap_or(1800),
             claude_working_dir: std::env::var("CLAUDE_WORKING_DIR").unwrap_or_else(|_| format!("{}/qq-assistant/claude_workspace", base_dir)),
             data_dir,
+            excluded_groups: parse_ids("EXCLUDED_GROUPS"),
+            excluded_users: parse_ids("EXCLUDED_USERS"),
         }
     }
+}
+
+fn parse_ids(key: &str) -> Vec<i64> {
+    std::env::var(key).ok()
+        .map(|v| v.split(',').filter_map(|s| s.trim().parse().ok()).collect())
+        .unwrap_or_default()
 }

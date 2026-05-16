@@ -228,9 +228,12 @@ async fn main() -> anyhow::Result<()> {
     let agent_max = cfg.max_tool_iterations;
     let agent_ch = chat_history.clone();
     let agent_mem = memory_store.clone();
+    let agent_excluded_groups = cfg.excluded_groups.clone();
+    let agent_excluded_users = cfg.excluded_users.clone();
     tokio::spawn(async move {
         agent::run(agent_rx, agent_llm, agent_api, (*agent_tx).clone(), agent_store,
-                   agent_sched, agent_tools, agent_max, agent_ch, agent_mem).await;
+                   agent_sched, agent_tools, agent_max, agent_ch, agent_mem,
+                   agent_excluded_groups, agent_excluded_users).await;
     });
 
     // === Spawn Web Server ===

@@ -48,6 +48,8 @@ pub async fn run(
     max_iterations: usize,
     chat_history: Arc<crate::store::MessageHistoryStore>,
     memory_store: Arc<MemoryStore>,
+    excluded_groups: Vec<i64>,
+    excluded_users: Vec<i64>,
 ) {
     let (tx, mut rx_queue) = tokio::sync::mpsc::unbounded_channel::<OneBotEvent>();
 
@@ -104,6 +106,14 @@ pub async fn run(
 
         // Process highest priority message
         while let Some(qmsg) = queue.pop() {
+            // Exclusion check: skip if group or user is in the excluded list
+            let is_excluded = qmsg.msg.group_id.map(|g| excluded_groups.contains(&g)).unwrap_or(false)
+                || excluded_users.contains(&qmsg.msg.user_id);
+            if is_excluded {
+                info!("Skipped excluded message from group:{:?} user:{}", qmsg.msg.group_id, qmsg.msg.user_id);
+                continue;
+            }
+
             let llm = llm.clone();
             let api = napcat_api.clone();
             let pt = processed_tx.clone();
