@@ -200,7 +200,7 @@ async fn handle_message(
     };
     let chat_id = msg.group_id.map(|g| format!("group_{}", g)).unwrap_or_else(|| format!("private_{}", msg.user_id));
     let mention_prefix = if is_mentioned { "\n⚠️ 这条消息提到了你" } else { "" };
-    let user_prompt = format!("消息来源: {}\n发送者: {}({})\n消息内容: {}{}", source, sender_name, msg.user_id, raw_text, mention_prefix);
+    let user_prompt = format!("===== 用户消息 =====\n来源: {}\n发送者: {}({})\n内容: {}{}\n===== 消息结束 =====", source, sender_name, msg.user_id, raw_text, mention_prefix);
 
     info!("Agent processing message from {}: {}", sender_name, &raw_text.chars().take(80).collect::<String>());
     let query_emb = llm.embed(&raw_text).await.ok();
