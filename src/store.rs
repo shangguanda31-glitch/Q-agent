@@ -19,7 +19,7 @@ fn open_db(path: &str) -> parking_lot::Mutex<Connection> {
          CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY,content TEXT,speaker TEXT,speaker_id INTEGER,source TEXT,group_id INTEGER,message_time TEXT,created_at TEXT);
          CREATE TABLE IF NOT EXISTS exclusions(id INTEGER PRIMARY KEY AUTOINCREMENT,exclude_type TEXT NOT NULL,target_id INTEGER NOT NULL,note TEXT,created_at TEXT,UNIQUE(exclude_type,target_id));
          CREATE TABLE IF NOT EXISTS chat_history(chat_id TEXT NOT NULL,role TEXT NOT NULL,content TEXT NOT NULL,msg_time TEXT,seq INTEGER DEFAULT 0);"
-    ).ok();
+    ).unwrap_or_else(|e| tracing::warn!("DB init failed (non-fatal): {}", e));
     parking_lot::Mutex::new(conn)
 }
 
@@ -60,7 +60,7 @@ impl EventStore {
         let conn = self.db.lock();
         let count: i64 = conn.query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0)).unwrap_or(0);
         if count >= 500 { conn.execute("DELETE FROM events WHERE id IN (SELECT id FROM events ORDER BY id ASC LIMIT ?)", params![count - 500 + 1]).ok(); }
-        conn.execute("INSERT INTO events(time,message_type,group_id,user_id,sender_name,raw_text,has_image,image_urls,has_file,file_name,analysis,raw_json)VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
+        let _ = conn.execute("INSERT INTO events(time,message_type,group_id,user_id,sender_name,raw_text,has_image,image_urls,has_file,file_name,analysis,raw_json)VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
             params![ev.time,ev.message_type,ev.group_id,ev.user_id,ev.sender_name,ev.raw_text,ev.has_image as i32,ev.image_urls.join(","),ev.has_file as i32,ev.file_name,ev.analysis.as_ref().map(|a|serde_json::to_string(a).unwrap_or_default()),ev.raw_json]).ok();
         drop(conn);
         self.cache.lock().unwrap().push_back(ev);
@@ -68,7 +68,7 @@ impl EventStore {
 
     pub fn recent(&self) -> Vec<ProcessedEvent> {
         let conn = self.db.lock();
-        let mut stmt = conn.prepare("SELECT time,message_type,group_id,user_id,sender_name,raw_text,has_image,image_urls,has_file,file_name,analysis,raw_json FROM events ORDER BY id DESC LIMIT 100").unwrap();
+        let mut stmt = conn.prepare("SELECT time,message_type,group_id,user_id,sender_name,raw_text,has_image,image_urls,has_file,file_name,analysis,raw_json FROM events ORDER BY id DESC LIMIT 100").expect("static SQL");
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| {
             Ok(ProcessedEvent {
@@ -115,7 +115,7 @@ impl ScheduleStore {
 
     pub fn list(&self) -> Vec<ScheduleEntry> {
         let conn = self.0.lock();
-        let mut stmt = conn.prepare("SELECT id,title,time,time_parsed,description,source,source_user,status,created_at FROM schedules ORDER BY created_at DESC").unwrap();
+        let mut stmt = conn.prepare("SELECT id,title,time,time_parsed,description,source,source_user,status,created_at FROM schedules ORDER BY created_at DESC").expect("static SQL");
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| Ok(ScheduleEntry{id:r.get(0)?,title:r.get(1)?,time:r.get(2)?,time_parsed:r.get(3)?,description:r.get(4)?,source:r.get(5)?,source_user:r.get(6)?,status:r.get(7)?,created_at:r.get(8)?})) {
             for row in rows { if let Ok(e) = row { out.push(e); } }
@@ -193,7 +193,7 @@ impl MemoryStore {
 
     pub fn all(&self) -> Vec<MemoryEntry> {
         let conn = self.0.lock();
-        let mut stmt = conn.prepare("SELECT id,content,tags,source,created_at,embedding FROM memories ORDER BY rowid DESC").unwrap();
+        let mut stmt = conn.prepare("SELECT id,content,tags,source,created_at,embedding FROM memories ORDER BY rowid DESC").expect("static SQL");
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| Ok(MemoryEntry{id:r.get(0)?,content:r.get(1)?,tags:get_str(r,2).split(',').filter_map(|s|if s.is_empty(){None}else{Some(s.to_string())}).collect(),source:r.get(3)?,created_at:r.get(4)?,embedding:r.get::<_,Option<String>>(5).unwrap_or(None).and_then(|s|serde_json::from_str(&s).ok())})) {
             for row in rows { if let Ok(e) = row { out.push(e); } }
@@ -248,7 +248,7 @@ impl NoteStore {
 
     pub fn list(&self) -> Vec<NoteEntry> {
         let conn = self.0.lock();
-        let mut stmt = conn.prepare("SELECT id,content,speaker,speaker_id,source,group_id,message_time,created_at FROM notes ORDER BY rowid DESC").unwrap();
+        let mut stmt = conn.prepare("SELECT id,content,speaker,speaker_id,source,group_id,message_time,created_at FROM notes ORDER BY rowid DESC").expect("static SQL");
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| Ok(NoteEntry{id:r.get(0)?,content:r.get(1)?,speaker:r.get(2)?,speaker_id:r.get(3)?,source:r.get(4)?,group_id:r.get(5)?,message_time:r.get(6)?,created_at:r.get(7)?})) {
             for row in rows { if let Ok(e) = row { out.push(e); } }
@@ -283,7 +283,7 @@ impl ExclusionStore {
 
     pub fn list(&self) -> Vec<ExclusionEntry> {
         let conn = self.0.lock();
-        let mut stmt = conn.prepare("SELECT id,exclude_type,target_id,note,created_at FROM exclusions ORDER BY exclude_type,target_id").unwrap();
+        let mut stmt = conn.prepare("SELECT id,exclude_type,target_id,note,created_at FROM exclusions ORDER BY exclude_type,target_id").expect("static SQL");
         let mut out = Vec::new();
         if let Ok(rows) = stmt.query_map([], |r| Ok(ExclusionEntry {
             id: r.get(0)?, exclude_type: r.get(1)?, target_id: r.get(2)?,
