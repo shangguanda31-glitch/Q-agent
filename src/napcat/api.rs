@@ -128,4 +128,36 @@ impl NapCatApi {
             Err(_) => vec![],
         }
     }
+
+    pub async fn get_group_msg_history(&self, group_id: i64, count: i32) -> Vec<Value> {
+        let resp = self.client
+            .post(format!("{}/get_group_msg_history", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&serde_json::json!({"group_id": group_id.to_string(), "count": count, "reverse_order": false, "disable_get_url": false, "parse_mult_msg": false, "quick_reply": false}))
+            .send()
+            .await;
+        match resp {
+            Ok(r) => match r.json::<Value>().await {
+                Ok(v) => v.pointer("/data/messages").and_then(|d| d.as_array()).cloned().unwrap_or_default(),
+                Err(_) => vec![],
+            },
+            Err(_) => vec![],
+        }
+    }
+
+    pub async fn get_friend_msg_history(&self, user_id: i64, count: i32) -> Vec<Value> {
+        let resp = self.client
+            .post(format!("{}/get_friend_msg_history", self.base_url))
+            .header("Authorization", self.auth_header())
+            .json(&serde_json::json!({"user_id": user_id.to_string(), "count": count, "reverse_order": false, "disable_get_url": false, "parse_mult_msg": false, "quick_reply": false}))
+            .send()
+            .await;
+        match resp {
+            Ok(r) => match r.json::<Value>().await {
+                Ok(v) => v.pointer("/data/messages").and_then(|d| d.as_array()).cloned().unwrap_or_default(),
+                Err(_) => vec![],
+            },
+            Err(_) => vec![],
+        }
+    }
 }

@@ -18,7 +18,7 @@ impl Tool for QQReadTool {
     fn name(&self) -> &str { "qq_read" }
 
     fn description(&self) -> &str {
-        "读取 QQ 聊天记录、群公告、群信息等。当用户询问历史消息或群信息时使用"
+        "读取 QQ 聊天记录（群/私聊）、群公告、群列表、好友列表等"
     }
 
     fn parameters_schema(&self) -> Value {
@@ -62,6 +62,35 @@ impl Tool for QQReadTool {
                     lines.join("\n")
                 };
                 ToolResult::ok(output)
+            }
+
+            "recent_messages" => {
+                let count = args.get("count").and_then(|v| v.as_i64()).unwrap_or(20).min(50) as i32;
+                match args.get("group_id").and_then(|v| v.as_i64()) {
+                    Some(gid) => {
+                        let msgs = self.api.get_group_msg_history(gid, count).await;
+                        if msgs.is_empty() { return ToolResult::ok("暂无消息记录"); }
+                        let lines: Vec<String> = msgs.iter().map(|m| {
+                            let sender = m.pointer("/sender/nickname").and_then(|v| v.as_str()).unwrap_or("未知");
+                            let text = m.pointer("/message").and_then(|v| v.as_str()).unwrap_or("");
+                            format!("[{}] {}", sender, text.chars().take(100).collect::<String>())
+                        }).collect();
+                        ToolResult::ok(lines.join("\n"))
+                    }
+                    None => {
+                        let uid = match args.get("user_id").and_then(|v| v.as_i64()) {
+                            Some(id) => id,
+                            None => return ToolResult::fail("需要 group_id 或 user_id 参数"),
+                        };
+                        let msgs = self.api.get_friend_msg_history(uid, count).await;
+                        if msgs.is_empty() { return ToolResult::ok("暂无消息记录"); }
+                        let lines: Vec<String> = msgs.iter().map(|m| {
+                            let text = m.pointer("/message").and_then(|v| v.as_str()).unwrap_or("");
+                            format!("{}", text.chars().take(100).collect::<String>())
+                        }).collect();
+                        ToolResult::ok(lines.join("\n"))
+                    }
+                }
             }
             "friend_list" => {
                 let friends = self.api.get_friend_list().await;
