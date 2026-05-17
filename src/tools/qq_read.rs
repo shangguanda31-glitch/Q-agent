@@ -63,6 +63,30 @@ impl Tool for QQReadTool {
                 };
                 ToolResult::ok(output)
             }
+            "friend_list" => {
+                let friends = self.api.get_friend_list().await;
+                if friends.is_empty() {
+                    return ToolResult::ok("好友列表为空");
+                }
+                let lines: Vec<String> = friends.iter().enumerate().map(|(i, f)| {
+                    let name = f.get("nickname").or_else(|| f.get("remark")).and_then(|v| v.as_str()).unwrap_or("未知");
+                    let uid = f.get("user_id").and_then(|v| v.as_i64()).unwrap_or(0);
+                    format!("{}. {} ({})", i + 1, name, uid)
+                }).collect();
+                ToolResult::ok(lines.join("\n"))
+            }
+            "group_info" => {
+                let groups = self.api.get_group_list().await;
+                if groups.is_empty() {
+                    return ToolResult::ok("暂无群聊");
+                }
+                let lines: Vec<String> = groups.iter().enumerate().map(|(i, g)| {
+                    let name = g.get("group_name").and_then(|v| v.as_str()).unwrap_or("未知群");
+                    let gid = g.get("group_id").and_then(|v| v.as_i64()).unwrap_or(0);
+                    format!("{}. {} ({})", i + 1, name, gid)
+                }).collect();
+                ToolResult::ok(lines.join("\n"))
+            }
             _ => ToolResult::fail(format!("不支持的操作: {}", action)),
         }
     }
