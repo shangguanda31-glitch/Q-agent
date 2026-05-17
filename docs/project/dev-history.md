@@ -576,6 +576,52 @@ LLM 搞不清 claude_code 是否完成，会重复调用。在工具返回值末
 
 ---
 
+
+### Git 历史清理
+
+发现初始提交中含有 NapCat token `20080103`、GitHub token 和个人路径。使用 `git-filter-repo` 重写全部 131 个 commit，替换敏感数据为占位符，force push 覆盖旧历史。
+
+同时：
+- NapCat token 更换为 `20061205`（旧的已泄露）
+- GitHub token 更换为仅 `public_repo` 权限的新 token
+- 旧 full-control token 已废弃
+
+### 安全修复（Issue #10、#11、#59）
+
+**#10 CRITICAL：PowerShell 命令注入**
+`notify.rs` 中用户输入直接拼接到 PowerShell 脚本，仅转义单引号。反引号、`${}`、`$()` 可绕过。修法：改用 XML 编码，所有特殊字符转义为 XML 实体。
+
+**#11：路径遍历**
+`workspace_file` API 未验证 `../`，可读取任意文件。修法：禁止 `..` 和 `/` 路径。
+
+**#59：Banner 泄露 token**
+启动时打印的 NapCat WebSocket URL 包含 access_token。修法：在 `?` 处截断，只显示地址部分。
+
+### 上下文隔离（Prompt 注入防护）
+
+用户消息用 `=====` 包裹，system prompt 告知 LLM 标记内为用户输入而非系统指令。即使用户说"忽略规则"也不会生效。
+
+### v0.2 Core 修复
+
+| Issue | 修法 |
+|-------|------|
+| #61 上下文摘要空数组 | 传入实际对话内容让 LLM 摘要 |
+| #62 exclude_type 无校验 | 限制仅允许 group/user |
+| #63 Binary 消息忽略 | 添加 warn 日志 |
+| #91 版本号硬编码 | `env!("CARGO_PKG_VERSION")` |
+| #93 HTML 转义不全 | 补全双引号和单引号 |
+
+### 里程碑分配
+
+84 个 issue 分配到 3 个 milestone：
+- **v0.2 Core**（06-14）：11 个，已关 5 个
+- **v0.3 Experience**（07-14）：39 个
+- **v1.0 Stable**（08-14）：34 个
+
+### 开发者文档
+
+创建 `docs/technical/developer.md`（开发者指南）和 `docs/technical/api-reference.md`（API 参考），涵盖项目结构、核心架构、Tool trait、Web API 端点、NapCat API、LLM API、工具调用协议等。
+
 ## 最终数据
 
 | 指标 | 值 |
