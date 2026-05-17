@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::time::Duration;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AgentMessage {
@@ -14,10 +15,18 @@ pub struct LLMClient {
 }
 
 impl LLMClient {
-    pub fn new(base_url: &str, embed_url: &str, model: &str) -> Self {
+    pub fn new(
+        base_url: &str,
+        embed_url: &str,
+        model: &str,
+        connect_timeout_secs: u64,
+        read_timeout_secs: u64,
+    ) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .no_proxy()
+                .connect_timeout(Duration::from_secs(connect_timeout_secs))
+                .read_timeout(Duration::from_secs(read_timeout_secs))
                 .build()
                 .expect("Failed to build HTTP client"),
             base_url: base_url.trim_end_matches('/').to_string(),

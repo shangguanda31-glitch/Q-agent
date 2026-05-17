@@ -198,7 +198,13 @@ async fn main() -> anyhow::Result<()> {
 
     // API clients
     let napcat_api = Arc::new(napcat::api::NapCatApi::new(&cfg.napcat_http_url, &cfg.napcat_token));
-    let llm = Arc::new(llm::LLMClient::new(&llm_url, &cfg.embed_url, &cfg.llm_model));
+    let llm = Arc::new(llm::LLMClient::new(
+        &llm_url,
+        &cfg.embed_url,
+        &cfg.llm_model,
+        cfg.llm_connect_timeout_secs,
+        cfg.llm_read_timeout_secs,
+    ));
 
     // Tool registry
     let tools = build_tool_registry(napcat_api.clone(), schedule_store.clone(), memory_store.clone(), note_store.clone(), llm.clone(), &cfg);

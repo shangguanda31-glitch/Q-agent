@@ -269,6 +269,8 @@ cargo run --release
 | `NAPCAT_TOKEN` | — | Auth token (required) |
 | `WEB_PORT` | `5050` | Web panel port |
 | `LLM_URL` | `http://127.0.0.1:8081` | LLM API address |
+| `LLM_CONNECT_TIMEOUT` | `10` | LLM HTTP connect timeout (s) |
+| `LLM_READ_TIMEOUT` | `600` | LLM HTTP per-read timeout (s) |
 | `LLAMA_MODEL_PATH` | `models/qwen3.5...gguf` | Model file path |
 | `LLAMA_SERVER_PATH` | `llama-server` | llama-server path |
 | `CLAUDE_CODE_TIMEOUT` | `1800` | Claude Code timeout (s) |
