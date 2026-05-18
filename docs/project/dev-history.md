@@ -3,6 +3,8 @@
 **作者**: Orin Voss
 **时间线**: 2026-03-25 → 2026-05-18
 **仓库**: [github.com/OrinVoss/Q-agent](https://github.com/OrinVoss/Q-agent)
+**OpenVINO 模型**: [huggingface.co/OrinVoss/qwen3.5-9b-ov](https://huggingface.co/OrinVoss/qwen3.5-9b-ov)
+**OpenVINO 服务**: [github.com/OrinVoss/qwen3.5-9b-openvino](https://github.com/OrinVoss/qwen3.5-9b-openvino)
 **提交数**: 145 commits
 **代码**: Rust + Qwen3.5-9B + SQLite + Axum + NapCatQQ
 
@@ -693,6 +695,9 @@ LLM 搞不清 claude_code 是否完成，会重复调用。在工具返回值末
 ### 05-18 ｜ OpenVINO 推理后端
 
 为项目添加 Intel GPU 推理能力。已有一个独立的 OpenVINO 项目在 `local_model_provider/OpenVINO/`，提供 OpenAI 兼容 API。详见其 [DEVLOG.md](../../../local_model_provider/OpenVINO/DEVLOG.md)。
+
+- **模型（HuggingFace）**：[OrinVoss/qwen3.5-9b-ov](https://huggingface.co/OrinVoss/qwen3.5-9b-ov)
+- **代码（GitHub）**：[OrinVoss/qwen3.5-9b-openvino](https://github.com/OrinVoss/qwen3.5-9b-openvino)
 
 ```
 OpenVINO :8000（Intel GPU, INT4 4.6GB, ~3s/推理）
