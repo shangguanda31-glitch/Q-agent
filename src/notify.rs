@@ -9,6 +9,8 @@ pub fn send_toast(title: &str, body: &str) {
 
     let ps_script = format!(
         r#"
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
 $xml = [Windows.Data.Xml.Dom.XmlDocument]::new()
 $xml.LoadXml(@"
 <toast duration=""long"">
