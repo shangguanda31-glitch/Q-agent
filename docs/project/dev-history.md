@@ -692,7 +692,7 @@ LLM 搞不清 claude_code 是否完成，会重复调用。在工具返回值末
 
 ### 05-18 ｜ OpenVINO 推理后端
 
-为项目添加 Intel GPU 推理能力。已有一个独立的 OpenVINO 项目在 `local_model_provider/OpenVINO/`，提供 OpenAI 兼容 API：
+为项目添加 Intel GPU 推理能力。已有一个独立的 OpenVINO 项目在 `local_model_provider/OpenVINO/`，提供 OpenAI 兼容 API。详见其 [DEVLOG.md](../../../local_model_provider/OpenVINO/DEVLOG.md)。
 
 ```
 OpenVINO :8000（Intel GPU, INT4 4.6GB, ~3s/推理）
