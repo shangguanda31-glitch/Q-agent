@@ -2,17 +2,17 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::llm::LLMClient;
+use crate::llm::LLMProvider;
 use crate::store::MemoryStore;
 use super::traits::{Tool, ToolResult};
 
 pub struct RememberTool {
     store: Arc<MemoryStore>,
-    llm: Arc<LLMClient>,
+    llm: Arc<dyn LLMProvider>,
 }
 
 impl RememberTool {
-    pub fn new(store: Arc<MemoryStore>, llm: Arc<LLMClient>) -> Arc<Self> { Arc::new(Self { store, llm }) }
+    pub fn new(store: Arc<MemoryStore>, llm: Arc<dyn LLMProvider>) -> Arc<Self> { Arc::new(Self { store, llm }) }
 }
 
 #[async_trait]
@@ -47,11 +47,11 @@ impl Tool for RememberTool {
 
 pub struct RecallTool {
     store: Arc<MemoryStore>,
-    llm: Arc<LLMClient>,
+    llm: Arc<dyn LLMProvider>,
 }
 
 impl RecallTool {
-    pub fn new(store: Arc<MemoryStore>, llm: Arc<LLMClient>) -> Arc<Self> { Arc::new(Self { store, llm }) }
+    pub fn new(store: Arc<MemoryStore>, llm: Arc<dyn LLMProvider>) -> Arc<Self> { Arc::new(Self { store, llm }) }
 }
 
 #[async_trait]

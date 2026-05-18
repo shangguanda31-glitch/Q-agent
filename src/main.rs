@@ -36,6 +36,23 @@ fn start_llama_server(cfg: &config::Config) -> (Option<std::process::Child>, Str
     let model_path = std::path::Path::new(&cfg.llama_model_path);
     let server_path = &cfg.llama_server_path;
 
+    // Respect explicitly configured LLM_URL (e.g. OpenVINO on :8000)
+    if let Ok(parsed) = url::Url::parse(&cfg.llm_url) {
+        if let Some(host) = parsed.host() {
+            let host_str = host.to_string();
+            let port = parsed.port().unwrap_or(80);
+            if port != 8081 || cfg.llm_url != format!("http://127.0.0.1:{}", port) {
+                if std::net::TcpStream::connect_timeout(
+                    &format!("{}:{}", host_str, port).parse().unwrap(),
+                    std::time::Duration::from_secs(2),
+                ).is_ok() {
+                    info!("LLM server already running at {}", cfg.llm_url);
+                    return (None, cfg.llm_url.clone());
+                }
+            }
+        }
+    }
+
     // First check if any port already has llama-server
     for &port in &ports_to_try {
         if check_llm_server_running(port) {
@@ -84,7 +101,7 @@ fn build_tool_registry(
     schedule_store: Arc<store::ScheduleStore>,
     memory_store: Arc<store::MemoryStore>,
     note_store: Arc<store::NoteStore>,
-    llm: Arc<llm::LLMClient>,
+    llm: Arc<dyn llm::LLMProvider>,
     cfg: &config::Config,
 ) -> Arc<tools::traits::ToolRegistry> {
     let mut reg = tools::traits::ToolRegistry::new();
@@ -205,7 +222,7 @@ async fn main() -> anyhow::Result<()> {
 
     // API clients
     let napcat_api = Arc::new(napcat::api::NapCatApi::new(&cfg.napcat_http_url, &cfg.napcat_token));
-    let llm = Arc::new(llm::LLMClient::new(&llm_url, &cfg.embed_url, &cfg.llm_model));
+    let llm = llm::create_provider(&cfg.llm_backend, &llm_url, &cfg.embed_url, &cfg.llm_model);
 
     // Tool registry
     let tools = build_tool_registry(napcat_api.clone(), schedule_store.clone(), memory_store.clone(), note_store.clone(), llm.clone(), &cfg);

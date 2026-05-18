@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 use tracing::{info, warn};
 
 use base64::Engine;
-use crate::llm::{LLMClient, AgentMessage};
+use crate::llm::{LLMProvider, AgentMessage};
 use crate::napcat::api::NapCatApi;
 use crate::napcat::types::{OneBotEvent, ProcessedEvent, MessageEvent};
 use crate::notify;
@@ -39,7 +39,7 @@ impl PartialOrd for QueuedMsg { fn partial_cmp(&self, other: &Self) -> Option<Or
 
 pub async fn run(
     mut rx: broadcast::Receiver<OneBotEvent>,
-    llm: Arc<LLMClient>,
+    llm: Arc<dyn LLMProvider>,
     napcat_api: Arc<NapCatApi>,
     processed_tx: broadcast::Sender<ProcessedEvent>,
     event_store: Arc<EventStore>,
@@ -132,7 +132,7 @@ pub async fn run(
 
 async fn handle_message(
     msg: MessageEvent,
-    llm: Arc<LLMClient>,
+    llm: Arc<dyn LLMProvider>,
     napcat_api: Arc<NapCatApi>,
     processed_tx: broadcast::Sender<ProcessedEvent>,
     event_store: Arc<EventStore>,
@@ -226,7 +226,7 @@ async fn handle_message(
             let old_text: String = old_msgs.iter()
                 .map(|m| format!("[{}]: {}", m.role, m.content.chars().take(200).collect::<String>()))
                 .collect::<Vec<_>>().join("\n").chars().take(3000).collect();
-            match llm.agent_chat(&[], "你是一个对话摘要助手。用简洁的语言总结对话要点，不超过200字。", None).await {
+            match llm.chat(&[], "你是一个对话摘要助手。用简洁的语言总结对话要点，不超过200字。", None).await {
                 Ok(summary_text) => { messages.insert(0, AgentMessage { role: "user".to_string(), content: format!("[对话摘要]\n{}", summary_text) }); info!("Context summary created (replaced {} messages)", split); }
                 Err(_) => { messages.insert(0, AgentMessage { role: "user".to_string(), content: format!("[历史摘要] 之前聊到了：{}", &old_text.chars().take(200).collect::<String>()) }); }
             }
@@ -262,7 +262,7 @@ async fn handle_message(
             }
         }
 
-        let response = match llm.agent_chat(&messages, &system_prompt, None).await {
+        let response = match llm.chat(&messages, &system_prompt, None).await {
             Ok(r) => r,
             Err(e) => { warn!("LLM agent error: {}", e); final_response = format!("LLM 错误: {}", e); break; }
         };

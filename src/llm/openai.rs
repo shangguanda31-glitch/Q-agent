@@ -1,19 +1,18 @@
+use async_trait::async_trait;
 use serde_json::Value;
 
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct AgentMessage {
-    pub role: String,
-    pub content: String,
-}
+use super::traits::{AgentMessage, LLMProvider};
 
-pub struct LLMClient {
+/// Provider for any OpenAI-compatible API.
+/// Covers: llama.cpp, OpenVINO server, vLLM, Ollama (OpenAI mode), OpenAI API, etc.
+pub struct OpenAIProvider {
     client: reqwest::Client,
     base_url: String,
     embed_url: String,
     model: String,
 }
 
-impl LLMClient {
+impl OpenAIProvider {
     pub fn new(base_url: &str, embed_url: &str, model: &str) -> Self {
         Self {
             client: reqwest::Client::builder()
@@ -25,13 +24,11 @@ impl LLMClient {
             model: model.to_string(),
         }
     }
+}
 
-    pub async fn agent_chat(
-        &self,
-        messages: &[AgentMessage],
-        system_prompt: &str,
-        image_b64: Option<&str>,
-    ) -> anyhow::Result<String> {
+#[async_trait]
+impl LLMProvider for OpenAIProvider {
+    async fn chat(&self, messages: &[AgentMessage], system_prompt: &str, image_b64: Option<&str>) -> anyhow::Result<String> {
         let mut body_parts: Vec<Value> = vec![
             serde_json::json!({"role": "system", "content": system_prompt}),
         ];
@@ -73,8 +70,7 @@ impl LLMClient {
         Ok(content.trim().to_string())
     }
 
-    /// Generate embedding vector for text via /v1/embeddings
-    pub async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>> {
+    async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>> {
         let body = serde_json::json!({
             "model": self.model,
             "input": text,
