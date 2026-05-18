@@ -4,7 +4,7 @@
 
 QAgent 是一个 Rust 编写的智能 QQ 助理后台服务。架构核心是 Agent 循环：LLM 自主判断消息，调用工具，处理结果。
 
-**技术栈**：Rust + tokio + Axum + SQLite + llama.cpp
+**技术栈**：Rust + tokio + Axum + SQLite + llama.cpp / OpenVINO
 
 ---
 
@@ -15,8 +15,9 @@ QAgent 是一个 Rust 编写的智能 QQ 助理后台服务。架构核心是 Ag
 | 工具 | 用途 | 获取方式 |
 |------|------|---------|
 | Rust 1.85+ | 编译运行 | rustup.rs |
-| llama.cpp | LLM 推理 | 预编译或自行编译 |
-| Qwen3.5-9B Q4_K_M | 主模型 | HuggingFace |
+| llama.cpp | LLM 推理（NVIDIA GPU）| 预编译或自行编译 |
+| OpenVINO Server | LLM 推理（Intel GPU） | `python server.py`（见 `local_model_provider/OpenVINO/`）|
+| Qwen3.5-9B INT4 | 主模型（OpenVINO） | HuggingFace OrinVoss/qwen3.5-9b-ov |
 | NapCatQQ | QQ 协议桥接 | GitHub Releases |
 | Tesseract 5.x | OCR（可选） | 项目自带 |
 | Claude Code CLI | 复杂任务（可选） | `npm i -g @anthropic-ai/claude-code` |
@@ -49,7 +50,11 @@ cargo run --release
 src/
 ├── main.rs              # 入口：启动 LLM → WebSocket → Agent → Web
 ├── config.rs            # 环境变量配置（18 个）
-├── llm.rs               # LLM + Embedding 客户端
+├── llm/                 # LLM 抽象层（多后端）
+│   ├── mod.rs           # 模块入口
+│   ├── traits.rs        # LLMProvider trait
+│   ├── openai.rs        # OpenAI 兼容实现
+│   └── factory.rs       # 工厂函数
 ├── store.rs             # SQLite 持久化（6 表）
 ├── notify.rs            # Windows Toast 通知
 │
@@ -165,18 +170,42 @@ impl ToolResult {
 
 ---
 
-## LLM 调用
+## LLM 抽象层
 
-### agent_chat（主要接口）
+采用多后端架构，通过 `LLMProvider` trait 统一接口，支持任意推理后端。
+
+### LLMProvider trait
 
 ```rust
-pub async fn agent_chat(
-    &self,
-    messages: &[AgentMessage],    // 对话历史
-    system_prompt: &str,          // 系统提示词
-    image_b64: Option<&str>,      // 图片（可选）
-) -> anyhow::Result<String>
+#[async_trait]
+pub trait LLMProvider: Send + Sync {
+    async fn chat(&self, messages: &[AgentMessage], system_prompt: &str, image_b64: Option<&str>) -> anyhow::Result<String>;
+    async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>>;
+}
 ```
+
+### 当前后端
+
+| 后端 | 端口 | 硬件 | 实现 |
+|------|------|------|------|
+| llama.cpp | 8081 | NVIDIA GPU (CUDA) | `OpenAIProvider` |
+| OpenVINO | 8000 | Intel GPU | `OpenAIProvider` |
+
+两者都使用 OpenAI 兼容 API，共享同一个 `OpenAIProvider` 实现。
+
+### 切换后端
+
+```env
+LLM_BACKEND=openai                  # 默认
+LLM_URL=http://127.0.0.1:8000      # OpenVINO
+LLM_URL=http://127.0.0.1:8081      # llama.cpp
+```
+
+### 添加新后端
+
+1. 新建 `src/llm/<name>.rs`，实现 `LLMProvider`
+2. `config.rs` 的 `LLMBackend` 枚举加新变体
+3. `factory.rs` 加匹配创建
 
 ### embed（语义向量）
 
@@ -239,13 +268,18 @@ chat_history -- 会话历史（持久化）
 
 ## 配置
 
-完整 18 个环境变量见 `README.md` 配置表。
+完整环境变量见 `README.md` 配置表。
 
 **核心配置：**
 ```env
 NAPCAT_TOKEN=            # 必填，NapCat 鉴权
-LLAMA_MODEL_PATH=        # 必填，模型文件路径
-LLAMA_SERVER_PATH=       # 必填，llama-server 路径
+
+# LLM 后端选择
+LLM_BACKEND=openai       # 默认 openai，预留扩展
+LLM_URL=http://127.0.0.1:8000    # OpenVINO
+# LLM_URL=http://127.0.0.1:8081  # llama.cpp（默认）
+
+EMBED_URL=http://127.0.0.1:8082  # Embedding 服务
 DATA_DIR=data            # 数据目录
 WEB_PORT=5050            # Web 面板端口
 ```
@@ -281,10 +315,15 @@ RUST_LOG=qq_assistant=debug cargo run --release
 # 仅查看 Web 面板
 # http://127.0.0.1:5050
 
-# 直接测试 LLM
+# 直接测试 LLM（llama.cpp）
 curl http://127.0.0.1:8081/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"qwen3.5","messages":[{"role":"user","content":"hi"}]}'
+
+# 直接测试 LLM（OpenVINO）
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hi"}],"max_tokens":100}'
 
 # 测试 Embedding
 curl http://127.0.0.1:8082/v1/embeddings \
@@ -313,3 +352,13 @@ mklink /J D:\llm D:\桌面\编程作品\Sandy ONE\local_model_provider
 ### 上下文超限
 模型上下文 8192 tokens，Agent 循环在超过 6144 token 时自动压缩。
 如果仍有溢出，降低 `MAX_TOKENS` 阈值或在 prompt 中减少冗余。
+
+### OpenVINO 问题
+
+**GPU 状态污染**：OpenVINO xe 驱动 bug，同一服务器进程的后续请求可能输出之前请求的缓存内容。
+调用 `POST /reset`（重编译 ~15s）或重启服务。
+
+**OpenVINO 服务未运行**：
+```bash
+cd local_model_provider/OpenVINO && python -m uvicorn server:app --host 127.0.0.1 --port 8000
+```

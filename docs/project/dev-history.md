@@ -1,9 +1,9 @@
 # QAgent 开发历程与日志
 
 **作者**: Orin Voss
-**时间线**: 2026-03-25 → 2026-05-16
+**时间线**: 2026-03-25 → 2026-05-18
 **仓库**: [github.com/OrinVoss/Q-agent](https://github.com/OrinVoss/Q-agent)
-**提交数**: 81 commits
+**提交数**: 145 commits
 **代码**: Rust + Qwen3.5-9B + SQLite + Axum + NapCatQQ
 
 ---
@@ -672,3 +672,77 @@ LLM 搞不清 claude_code 是否完成，会重复调用。在工具返回值末
 *从自进化觉醒周期，到一个能用的 QQ 助理。删掉 90% 的想法，把 10% 做到极致。*
 
 **两次尝试，一次失败，一次成功。差的不只是代码，是"想做什么"和"能做什么"之间的距离。**
+
+---
+
+## 第四章：扫遍全城
+
+### 05-16 ~ 05-17 ｜ 50 轮代码质量扫描
+
+全面启动子代理扫描，一个模块一个模块扫，扫 50 轮。最终发现了 **260 个问题**：
+
+| 级别 | 数量 |
+|------|------|
+| CRITICAL | 1 |
+| HIGH | 39 |
+| MEDIUM | 110 |
+| LOW | 110 |
+
+完整报告写入 `docs/code-quality-report.md`。
+
+### 05-18 ｜ OpenVINO 推理后端
+
+为项目添加 Intel GPU 推理能力。已有一个独立的 OpenVINO 项目在 `local_model_provider/OpenVINO/`，提供 OpenAI 兼容 API：
+
+```
+OpenVINO :8000（Intel GPU, INT4 4.6GB, ~3s/推理）
+llama.cpp :8081（NVIDIA GPU, CUDA）
+```
+
+配置切换：
+```env
+LLM_URL=http://127.0.0.1:8000   # OpenVINO
+LLM_URL=http://127.0.0.1:8081   # llama.cpp
+```
+
+`main.rs` 的 `start_llama_server` 增加了对 `cfg.llm_url` 的优先检查，避免覆盖用户的显式配置。
+
+### 05-18 ｜ LLM 抽象层
+
+将 `src/llm.rs` 从单文件重构为 `src/llm/` 模块，引入 `LLMProvider` trait：
+
+```
+src/llm/
+├── mod.rs        — 模块入口
+├── traits.rs     — LLMProvider trait (chat + embed)
+├── openai.rs     — OpenAI 兼容实现（覆盖 llama.cpp, OpenVINO, vLLM）
+└── factory.rs    — 工厂函数
+```
+
+核心设计：
+
+```rust
+#[async_trait]
+pub trait LLMProvider: Send + Sync {
+    async fn chat(&self, messages: &[AgentMessage], system_prompt: &str, image_b64: Option<&str>) -> anyhow::Result<String>;
+    async fn embed(&self, text: &str) -> anyhow::Result<Vec<f32>>;
+}
+```
+
+- 向后兼容：现有调用方 `Arc<LLMClient>` → `Arc<dyn LLMProvider>`，仅需改类型签名
+- 新增后端只需新建 provider 文件 + factory 加一行
+- config.rs 新增 `LLMBackend` 枚举 + `llm_backend` 字段
+
+## 最终数据（更新）
+
+| 指标 | 值 |
+|------|-----|
+| 总 Commits | 145 |
+| Changelogs | 43+ |
+| GitHub Issues | 84（3 个 Milestone）|
+| 工具数量 | 10 |
+| 代码语言 | Rust |
+| LLM 后端 | llama.cpp (CUDA) + OpenVINO (Intel GPU) |
+| 推理抽象层 | LLMProvider trait + factory |
+| 存储 | SQLite WAL（6 表）|
+| Web | Axum + SSE + SPA |
